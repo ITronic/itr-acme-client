@@ -21,6 +21,9 @@
  *
  */
 
+/** Use PHP strict mode */
+declare(strict_types=1);
+
 /**
  * Class itrAcmeClient Main class
  */
@@ -163,7 +166,7 @@ class itrAcmeClient {
    * @return bool True if everything is ok
    * @throws Exception for Fatal errors
    */
-  public function init() {
+  public function init(): bool {
 
     // check if we are already initialised
     $this->log('Start initialisation.', 'debug');
@@ -218,9 +221,9 @@ class itrAcmeClient {
   /**
    * Create a private and public key pair and register the account
    *
-   * @return boolean True on success
+   * @return bool True on success
    */
-  public function createAccount() {
+  public function createAccount(): bool {
 
     $this->log('Starting account registration', 'info');
 
@@ -264,8 +267,9 @@ class itrAcmeClient {
    * Create a public private keypair for all given domains and sign it
    *
    * @param array $domains A list of domainnames
+   * @return array Returns the certificate
    */
-  public function signDomains(array $domains) {
+  public function signDomains(array $domains): array {
     $this->log('Starting certificate generation for domains', 'info');
 
     // Load private account key
@@ -496,10 +500,10 @@ class itrAcmeClient {
   /**
    * Generate a new public private key pair and save it to the given directory
    *
-   * @param string|boolean $outputDir The directory for saveing the keys
+   * @param string|bool $outputDir The directory for saveing the keys
    * @return string Private key
    */
-  protected function generateKey($outputDir = false) {
+  protected function generateKey($outputDir = false): string {
 
     $this->log('Starting key generation.', 'info');
 
@@ -543,10 +547,9 @@ class itrAcmeClient {
    * Generate Diffie-Hellman Parameters
    *
    * @param int $bits The length in bits
-   *
    * @return string The Diffie-Hellman Parameters as pem
    */
-  public function getDhParameters($bits = 2048) {
+  public function getDhParameters(int $bits = 2048): string {
 
     if (substr($this->dhParamFile, 0, 1) == '/') {
       $dhParamFile = $this->dhParamFile;
@@ -611,8 +614,9 @@ class itrAcmeClient {
    *
    * @param string $uri Relativ uri to post the request to
    * @param array $payload The payload to send
+   * @return void
    */
-  public function signedRequest($uri, array $payload) {
+  public function signedRequest(string $uri, array $payload) {
 
     $this->log('Start signing request', 'info');
 
@@ -682,11 +686,11 @@ class itrAcmeClient {
   /**
    * Generate a certificate signing request
    *
-   * @param $privateKey The Private key we want to sign
+   * @param string $privateKey The Private key we want to sign
    * @param array $domains The Domains we want to sign
    * @return string the CSR
    */
-  private function generateCsr($privateKey, array $domains) {
+  private function generateCsr(string $privateKey, array $domains): string {
 
     $tempConfigHandle = tmpfile();
     $dn               = $this->certDistinguishedName;
@@ -746,7 +750,7 @@ class itrAcmeClient {
    * @param string $domain The Domainname we need the path for
    * @return string The absolute path to the acme-challenge directory
    */
-  public function getDomainWellKnownPath($domain) {
+  public function getDomainWellKnownPath(string $domain): string {
     $path = $this->webRootDir;
 
     rtrim($path, '/');
@@ -767,8 +771,9 @@ class itrAcmeClient {
    *
    * @param string $message The log message
    * @param string $level The log level used for Pse logging
+   * @return void
    */
-  public function log($message, $level = 'info') {
+  public function log(string $message, string $level = 'info') {
     if ($this->logger) {
       $this->logger->log($level, $message);
     } else {
@@ -786,16 +791,17 @@ interface itrAcmeChallengeManager {
    * @param string $domain
    * @return mixed
    */
-  public function validateDomainControl($domain);
+  public function validateDomainControl(string $domain);
 
   /**
-   * Save the challenge token to the well-known path
+   * Prepare the challenge for $domain
    *
    * @param string $domain
    * @param array $challenge
    * @param array $accountKeyDetails
+   * @return mixed
    */
-  public function prepareChallenge($domain, $challenge, $accountKeyDetails);
+  public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails);
 
 }
 
@@ -815,10 +821,17 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
 
   /**
    * @var string The challenge type http
+   * @return bool
    */
   public $type = 'http-01';
 
-  public function validateDomainControl($domain) {
+  /**
+   * This function validates if we control the domain so we can complete the challenge
+   *
+   * @param string $domain
+   * @return bool
+   */
+  public function validateDomainControl(string $domain): bool {
 
     // Get Well-known Path and create it if it doesn't exists
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
@@ -861,8 +874,9 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    * @param string $domain
    * @param array $challenge
    * @param array $accountKeyDetails
+   * @return string
    */
-  public function prepareChallenge($domain, $challenge, $accountKeyDetails) {
+  public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails): string {
 
     // get the well-known path, we know that it already exists and we can write to it
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
@@ -900,14 +914,17 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
 
   }
 
-  public function cleanupChallenge($domain, $challenge) {
+  /**
+   * @param string $domain
+   * @param array $challenge
+   * @return void
+   */
+  public function cleanupChallenge(string $domain, array $challenge) {
     // get the well-known path, we know that it already exists and we can write to it
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
 
     unlink($domainWellKnownPath . '/' . $challenge['token']);
-
   }
-
 }
 
 
@@ -928,10 +945,9 @@ class RestHelper {
    * @param string $url The url
    * @param array $obj The parameters
    * @param string $return The Format of the result
-   *
    * @return array|string  The result
    */
-  public static function get($url, $obj = [], $return = 'print') {
+  public static function get(string $url, array $obj = [], string $return = 'print') {
 
     $curl = self::loadCurl($url);
 
@@ -947,12 +963,11 @@ class RestHelper {
    * Call the url as POST
    *
    * @param string $url The url
-   * @param array $obj The parameters
+   * @param array|string $obj The parameters
    * @param string $return The Format of the result
-   *
    * @return array|string  The result
    */
-  public static function post($url, $obj = [], $return = 'print') {
+  public static function post(string $url, $obj = [], string $return = 'print') {
 
     $curl = self::loadCurl($url);
 
@@ -972,7 +987,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function put($url, $obj = [], $return = 'print') {
+  public static function put(string $url, array $obj = [], string $return = 'print') {
 
     $curl = self::loadCurl($url);
 
@@ -992,7 +1007,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function delete($url, $obj = [], $return = 'print') {
+  public static function delete(string $url, array $obj = [], string $return = 'print') {
 
     $curl = self::loadCurl($url);
 
@@ -1006,9 +1021,10 @@ class RestHelper {
   /**
    * Create a cUrl object
    *
+   * @param string $url The url
    * @return resource   The curl resource
    */
-  public static function loadCurl($url) {
+  public static function loadCurl(string $url) {
 
     $curl = curl_init();
 
@@ -1036,7 +1052,7 @@ class RestHelper {
    *
    * @return array|string   The result based on $return parameter
    */
-  public static function execCurl($curl, $return = 'print') {
+  public static function execCurl($curl, string $return = 'print') {
 
     $data = curl_exec($curl);
     $info = curl_getinfo($curl);
@@ -1062,7 +1078,7 @@ class RestHelper {
    * @param string $data The input string
    * @return string The base64 url safe string
    */
-  public static function base64url_encode($data) {
+  public static function base64url_encode(string $data): string {
     return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
   }
 
@@ -1072,7 +1088,7 @@ class RestHelper {
    * @param string $data The base64 url safe string
    * @return string The decoded string
    */
-  public static function base64url_decode($data) {
+  public static function base64url_decode(string $data): string {
     return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
   }
 }
