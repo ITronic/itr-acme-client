@@ -1,0 +1,112 @@
+ITronic ACME Client
+====================
+
+This library implements the ACME 1.0 draft 04 protocol (https://tools.ietf.org/html/draft-ietf-acme-acme-04)
+
+Requirements
+---------------------
+
+* PHP 7.0+
+* Openssl 1.0+
+* Curl
+
+Usage
+---------------------
+
+We have some examples in the examples folders with comments.
+
+Most simple way is to execute simple.php, but you have to modify some variables in it so it reflect your local settings.
+
+    # php simple.php
+
+Should result in someting like this:
+
+2017-09-06 22:30:16 [debug] Start initialisation.
+2017-09-06 22:30:16 [debug] Initialisation done.
+2017-09-06 22:30:16 [info] Starting account registration
+2017-09-06 22:30:16 [info] Account already exists
+2017-09-06 22:30:16 [info] Starting certificate generation for domains
+2017-09-06 22:30:16 [debug] Check local access for domain: searx.at
+2017-09-06 22:30:16 [debug] Try saving local to: /var/www/.well-known/acme-challenge/local_check.txt
+2017-09-06 22:30:16 [debug] Check local access for domain: www.searx.at
+2017-09-06 22:30:16 [debug] Try saving local to: /var/www/.well-known/acme-challenge/local_check.txt
+2017-09-06 22:30:16 [info] Check local successfully completed!
+2017-09-06 22:30:16 [info] Requesting challenges for domain searx.at
+2017-09-06 22:30:16 [info] Start signing request
+2017-09-06 22:30:16 [info] Sending signed request to https://acme-staging.api.letsencrypt.org/acme/new-authz
+2017-09-06 22:30:17 [info] Found challenge for Domain searx.at
+2017-09-06 22:30:17 [info] Token is available at http://searx.at/.well-known/acme-challenge/TASdoXhWutv0It_K_CjoZRQdzwh3HtGHYfqL60Wor6Y
+2017-09-06 22:30:17 [info] Notify CA that the challenge is ready
+2017-09-06 22:30:17 [info] Start signing request
+2017-09-06 22:30:17 [info] Sending signed request to https://acme-staging.api.letsencrypt.org/acme/challenge/VMS56QF0MPPdRmBTgvs1UxqTK9yzPWjRdhXYkDvCJV4/56776363
+2017-09-06 22:30:18 [info] Verification status: valid
+2017-09-06 22:30:18 [info] Requesting challenges for domain www.searx.at
+2017-09-06 22:30:18 [info] Start signing request
+2017-09-06 22:30:18 [info] Sending signed request to https://acme-staging.api.letsencrypt.org/acme/new-authz
+2017-09-06 22:30:18 [info] Found challenge for Domain www.searx.at
+2017-09-06 22:30:18 [info] Token is available at http://www.searx.at/.well-known/acme-challenge/h7I_MhujRTYXek36l8rkCwdfdcChDSKDJXSkeoem1Kg
+2017-09-06 22:30:18 [info] Notify CA that the challenge is ready
+2017-09-06 22:30:18 [info] Start signing request
+2017-09-06 22:30:18 [info] Sending signed request to https://acme-staging.api.letsencrypt.org/acme/challenge/Y5kAEt1j4Trke72xptdhYyodi_SK0RzsBqikWQg-91Y/56805310
+2017-09-06 22:30:19 [info] Verification status: valid
+2017-09-06 22:30:19 [info] Starting key generation.
+2017-09-06 22:30:20 [info] Key generation finished.
+2017-09-06 22:30:20 [info] Start signing request
+2017-09-06 22:30:20 [info] Sending signed request to https://acme-staging.api.letsencrypt.org/acme/new-cert
+2017-09-06 22:30:21 [info] Certificate generation complete.
+2017-09-06 22:30:21 [info] Load chain cert from: https://acme-staging.api.letsencrypt.org/acme/issuer-cert
+2017-09-06 22:30:21 [notice] Successfuly created certificate for domain: searx.at
+2017-09-06 22:30:21 [notice] Successfuly created certificate for domain: www.searx.at
+2017-09-06 22:30:21 [info] Diffie-Hellman Parameters already exists.
+2017-09-06 22:30:21 [info] Certificate generation finished.
+Array
+(
+    [RSA] => Array
+        (
+            [cert] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+
+            [chain] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+
+            [key] => -----BEGIN PRIVATE KEY-----
+MII...
+-----END PRIVATE KEY-----
+
+            [pem] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+-----BEGIN PRIVATE KEY-----
+MII...
+-----END PRIVATE KEY-----
+-----BEGIN DH PARAMETERS-----
+MII...
+-----END DH PARAMETERS-----
+
+        )
+
+    [dh] => -----BEGIN DH PARAMETERS-----
+MII...
+-----END DH PARAMETERS-----
+
+)
+
+The simpleSaveToDir.php examples saves the certificates to File.
+
+Limitations
+---------------------
+
+* No revocation function
+* Only http-01 challenge support
+* Only RSA support
+
+Links
+---------------------
+
+* https://github.com/ITronic/itr-acme-client
+
