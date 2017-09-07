@@ -508,8 +508,8 @@ class itrAcmeClient {
     $this->log('Starting key generation.', 'info');
 
     $configargs = [
-      'private_key_type' => $this->certKeyTypes[0],
-      'private_key_bits' => $this->certRsaKeyBits,
+      'private_key_type' => constant('OPENSSL_KEYTYPE_' . $this->certKeyTypes[0]),
+      'private_key_bits' => $this->certRsaKeyBits
     ];
 
     // create the certificate key
@@ -696,7 +696,7 @@ class itrAcmeClient {
     $dn               = $this->certDistinguishedName;
     $dn['commonName'] = $domains[0];
     $keyConfig        = [
-      'private_key_type' => $this->certKeyTypes[0],
+      'private_key_type' => constant('OPENSSL_KEYTYPE_' . $this->certKeyTypes[0]),
       'digest_alg'       => $this->certDigestAlg,
       'private_key_bits' => $this->certRsaKeyBits,
       'config'           => stream_get_meta_data($tempConfigHandle)['uri']
