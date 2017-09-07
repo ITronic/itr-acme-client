@@ -32,7 +32,7 @@ class itrAcmeClient {
   /**
    * @var bool Set API endpoint to testing
    */
-  public $debug = false;
+  public $testing = false;
 
   /**
    * @var string The ACME endpoint of the Certificate Authority
@@ -196,7 +196,7 @@ class itrAcmeClient {
     }
 
     // change API endpoint if debug is true
-    if ($this->debug) {
+    if ($this->testing) {
       $this->ca = $this->caTesting;
     }
 
@@ -227,7 +227,9 @@ class itrAcmeClient {
 
     $this->log('Starting account registration', 'info');
 
-    if (is_file($this->certAccountDir . '/private.key')) {
+    $keyType = $this->certKeyTypes[0];
+
+    if (is_file($this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key')) {
       $this->log('Account already exists', 'info');
       return true;
     }
@@ -272,8 +274,10 @@ class itrAcmeClient {
   public function signDomains(array $domains): array {
     $this->log('Starting certificate generation for domains', 'info');
 
+    $keyType = $this->certKeyTypes[0];
+
     // Load private account key
-    $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/private.key');
+    $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
       $this->log('Cannot read private account key: ' . openssl_error_string(), 500, 'critical');
@@ -507,8 +511,10 @@ class itrAcmeClient {
 
     $this->log('Starting key generation.', 'info');
 
+    $keyType = $this->certKeyTypes[0];
+
     $configargs = [
-      'private_key_type' => constant('OPENSSL_KEYTYPE_' . $this->certKeyTypes[0]),
+      'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
       'private_key_bits' => $this->certRsaKeyBits
     ];
 
@@ -533,9 +539,9 @@ class itrAcmeClient {
         }
       }
 
-      if (file_put_contents($outputDir . '/private.key', $privateKey) === false) {
-        $this->log('Failed to create private key file: ' . $outputDir . '/private.key', 'critical');
-        throw new \RuntimeException('Failed to create private key file: ' . $outputDir, 500);
+      if (file_put_contents($outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', $privateKey) === false) {
+        $this->log('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 'critical');
+        throw new \RuntimeException('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 500);
       }
     }
 
@@ -620,8 +626,10 @@ class itrAcmeClient {
 
     $this->log('Start signing request', 'info');
 
+    $keyType = $this->certKeyTypes[0];
+
     // Load private account key
-    $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/private.key');
+    $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
       $this->log('Cannot read private account key: ' . openssl_error_string(), 500, 'critical');
@@ -764,6 +772,25 @@ class itrAcmeClient {
     }
 
     return $path;
+  }
+
+  /**
+   * Adds testing prefix if we are in testing mode and keytype
+   *
+   * @param string $keyType The key Type
+   * @return string Return text Prefixes
+   */
+  protected function getKeyPrefix(string $keyType): string {
+
+    $prefix = '';
+
+    if ($this->testing) {
+      $prefix .= 'testing-';
+    }
+
+    $prefix .= $keyType . '-';
+
+    return $prefix;
   }
 
   /**
