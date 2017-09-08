@@ -336,7 +336,7 @@ class itrAcmeClient {
       // Check if our challengeManager is supported
       $challenge = false;
       foreach ($response['challenges'] as $k => $v) {
-        if ($this->challengeManager->type == $v['type']) {
+        if ($this->challengeManager->type === $v['type']) {
           $challenge = $v;
           break;
         }
@@ -546,7 +546,7 @@ class itrAcmeClient {
         }
       }
 
-      if (file_put_contents($outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', $privateKey) === false) {
+      if (!is_writable($outputDir) || file_put_contents($outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', $privateKey) === false) {
         $this->log('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 'critical');
         throw new \RuntimeException('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 500);
       }
@@ -564,7 +564,7 @@ class itrAcmeClient {
    */
   public function getDhParameters(int $bits = 2048): string {
 
-    if (substr($this->dhParamFile, 0, 1) == '/') {
+    if (substr($this->dhParamFile, 0, 1) === '/') {
       $dhParamFile = $this->dhParamFile;
     } else {
       $dhParamFile = $this->certAccountDir . '/' . $this->dhParamFile;
@@ -1095,7 +1095,7 @@ class RestHelper {
     $header = substr($data, 0, $info['header_size']);
     $body   = substr($data, $info['header_size']);
 
-    if ($return == 'print') {
+    if ($return === 'print') {
       return [
         'status' => $info['http_code'],
         'header' => $header,
