@@ -280,7 +280,7 @@ class itrAcmeClient {
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
-      $this->log('Cannot read private account key: ' . openssl_error_string(), 500, 'critical');
+      $this->log('Cannot read private account key: ' . openssl_error_string(), 'critical');
       throw new \RuntimeException('Cannot read private account key: ' . openssl_error_string(), 500);
     }
 
@@ -632,7 +632,7 @@ class itrAcmeClient {
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
-      $this->log('Cannot read private account key: ' . openssl_error_string(), 500, 'critical');
+      $this->log('Cannot read private account key: ' . openssl_error_string(), 'critical');
       throw new \RuntimeException('Cannot read private account key: ' . openssl_error_string(), 500);
     }
 
