@@ -882,7 +882,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     $this->itrAcmeClient->log('Try saving local to: ' . $domainWellKnownPath . '/local_check.txt', 'debug');
 
     if (!file_put_contents($domainWellKnownPath . '/local_check.txt', 'OK')) {
-      throw new \RuntimeException('Cannot create local check file at ' . $domainWellKnownPath, 500);
+      throw new \RuntimeException('Cannot create local check file at ' . $domainWellKnownPath . '/local_check.txt', 500);
     }
 
     // Set webserver compatible permissions
@@ -895,8 +895,8 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     unlink($domainWellKnownPath . '/local_check.txt');
 
     // Check for http error or wrong body contant
-    if ($result['status'] !== 200 || $result['body'] !== 'OK') {
-      throw new \RuntimeException('Failed to validate content of local check file at ' . $domainWellKnownPath, 500);
+    if ($response !== 'OK') {
+      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/local_check.txt', 500);
     }
 
     return true;
