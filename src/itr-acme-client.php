@@ -53,6 +53,11 @@ class itrAcmeClient {
   public $caTesting = 'https://acme-staging.api.letsencrypt.org';
 
   /**
+   * @var bool Disable builtin valiation if we control domains
+   */
+  public $disableValidation = false;
+
+  /**
    * @var string|itrAcmeChallengeManagerHttp The challenge Manager class or an itrAcmeChallengeManagerHttp object
    */
   public $challengeManager = 'itrAcmeChallengeManagerHttp';
@@ -288,6 +293,7 @@ class itrAcmeClient {
     $accountKeyDetails = openssl_pkey_get_details($privateAccountKey);
 
     // check if all domains are reachable for us
+    if($this->disableValidation !== true) {
     foreach ($domains as $domain) {
 
       $this->log('Check local access for domain: ' . $domain, 'debug');
@@ -303,6 +309,7 @@ class itrAcmeClient {
       }
     }
     $this->log('Check local successfully completed!', 'info');
+    }
 
     // Get challenge and validate each domain
     foreach ($domains as $domain) {
