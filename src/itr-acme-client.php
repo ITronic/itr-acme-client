@@ -293,22 +293,22 @@ class itrAcmeClient {
     $accountKeyDetails = openssl_pkey_get_details($privateAccountKey);
 
     // check if all domains are reachable for us
-    if($this->disableValidation !== true) {
-    foreach ($domains as $domain) {
+    if ($this->disableValidation !== true) {
+      foreach ($domains as $domain) {
 
-      $this->log('Check local access for domain: ' . $domain, 'debug');
+        $this->log('Check local access for domain: ' . $domain, 'debug');
 
-      // Ask the challengeManager to validate Domain control
-      try {
-        if (!$this->challengeManager->validateDomainControl($domain)) {
-          throw new \RuntimeException('Failed to validate control of ' . $domain, 500);
+        // Ask the challengeManager to validate Domain control
+        try {
+          if (!$this->challengeManager->validateDomainControl($domain)) {
+            throw new \RuntimeException('Failed to validate control of ' . $domain, 500);
+          }
+        } catch (\RuntimeException $e) {
+          $this->log($e->getMessage(), 'critical');
+          throw $e;
         }
-      } catch (\RuntimeException $e) {
-        $this->log($e->getMessage(), 'critical');
-        throw $e;
       }
-    }
-    $this->log('Check local successfully completed!', 'info');
+      $this->log('Check local successfully completed!', 'info');
     }
 
     // Get challenge and validate each domain
@@ -889,13 +889,16 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     chmod($domainWellKnownPath . '/local_check.txt', $this->itrAcmeClient->webServerFilePerm);
 
     // Validate local_check.txt over http
-    $result = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/local_check.txt');
+    // Disable server ssl verification, its possible that the certificate is invalid or expired but we don't care
+    RestHelper::$verfiySsl = false;
+    $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/local_check.txt');
+    RestHelper::$verfiySsl = true;
 
     // Cleanup before validation because we want a clean directory if we fail validating
     unlink($domainWellKnownPath . '/local_check.txt');
 
     // Check for http error or wrong body contant
-    if ($response !== 'OK') {
+    if ($response['body'] !== 'OK') {
       throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/local_check.txt', 500);
     }
 
@@ -936,13 +939,22 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
 
     // Validate that challenge repsonse is reachable
     $challengeResponseUrl = 'http://' . $domain . '/.well-known/acme-challenge/' . $challenge['token'];
-    $result               = RestHelper::get($challengeResponseUrl);
 
-    if ($result['body'] != $challengeBody) {
-      throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl, 500);
+    if (!$this->itrAcmeClient->disableValidation) {
+      // Disable server ssl verification, its possible that the certificate is invalid or expired but we don't care
+      RestHelper::$verfiySsl = false;
+      $result                = RestHelper::get($challengeResponseUrl);
+      RestHelper::$verfiySsl = true;
+
+      if ($result['body'] != $challengeBody) {
+        throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl, 500);
+      }
+
+      $this->itrAcmeClient->log('Token is available at ' . $challengeResponseUrl, 'info');
+    } else {
+      $this->itrAcmeClient->log('Token should be available at ' . $challengeResponseUrl, 'info');
     }
 
-    $this->itrAcmeClient->log('Token is available at ' . $challengeResponseUrl, 'info');
 
     return $challengeBody;
 
@@ -973,6 +985,9 @@ class RestHelper {
   /** @var string Password */
   static $password;
 
+  /** @var bool Check for trusted PEER and HOSTNAME */
+  static $verfiySsl = true;
+
   /**
    * Call the url as GET
    *
@@ -990,7 +1005,6 @@ class RestHelper {
     }
 
     return self::execCurl($curl, $return);
-
   }
 
   /**
@@ -1009,7 +1023,6 @@ class RestHelper {
     curl_setopt($curl, CURLOPT_POSTFIELDS, $obj);
 
     return self::execCurl($curl, $return);
-
   }
 
   /**
@@ -1029,7 +1042,6 @@ class RestHelper {
     curl_setopt($curl, CURLOPT_POSTFIELDS, $obj);
 
     return self::execCurl($curl, $return);
-
   }
 
   /**
@@ -1049,7 +1061,6 @@ class RestHelper {
     curl_setopt($curl, CURLOPT_POSTFIELDS, $obj);
 
     return self::execCurl($curl, $return);
-
   }
 
   /**
@@ -1064,14 +1075,15 @@ class RestHelper {
 
     curl_setopt_array($curl, [
       CURLOPT_URL            => $url,
-      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_RETURNTRANSFER => 1,
       CURLOPT_HTTPHEADER     => [
         'Accept: application/json',
         'Content-Type: application/json'
       ],
-      CURLOPT_HEADER         => true,
-      CURLOPT_SSL_VERIFYPEER => true,
-      CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
+      CURLOPT_HEADER         => 1,
+      CURLOPT_SSL_VERIFYPEER => self::$verfiySsl === true ? 2 : 0,
+      CURLOPT_SSL_VERIFYHOST => self::$verfiySsl === true ? 1 : 0,
+      CURLOPT_HTTPAUTH       => !empty(self::$username) ? CURLAUTH_BASIC : CURLAUTH_NONE,
       CURLOPT_USERPWD        => self::$username . ':' . self::$password
     ]);
 
@@ -1089,7 +1101,15 @@ class RestHelper {
   public static function execCurl($curl, string $return = 'print') {
 
     $data = curl_exec($curl);
+    if($data === false)
+    {
+     throw new \RuntimeException(curl_error($curl), 500);
+    }
     $info = curl_getinfo($curl);
+    if($info === false)
+    {
+     throw new \RuntimeException(curl_error($curl), 500);
+    }
     curl_close($curl);
 
     $header = substr($data, 0, $info['header_size']);
