@@ -100,6 +100,11 @@ class itrAcmeClient {
   public $certAccountDir = '/etc/ssl/accounts';
 
   /**
+   * @var int Hours to cache the certificate chain
+   */
+  public $certChainCache = 24;
+
+  /**
    * @var string This token will be attached to the $certAccountDir
    */
   public $certAccountToken = '';
@@ -456,7 +461,7 @@ class itrAcmeClient {
         $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
 
         // Load certificate chain from file or from web
-        if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - 86400) {
+        if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - ($this->certChainCache * 60 * 60)) {
           $this->log('Load chain certificate from cache: ' . $certChainCacheFile, 'info');
           $certChain = file_get_contents($certChainCacheFile);
         } else {
