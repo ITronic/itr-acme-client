@@ -6,7 +6,7 @@ This library implements the ACME 1.0 draft 04 protocol (https://tools.ietf.org/h
 Requirements
 ---------------------
 
-* PHP 7.0+
+* PHP 7.0+ (For EC certificates 7.1+)
 * Openssl 1.0+
 * Curl
 
@@ -19,7 +19,7 @@ Most simple way is to execute simple.php, but you have to modify some variables 
 
     # php simple.php
 
-Should result in someting like this:
+Should result in something like this:
 
 2017-09-06 22:30:16 [debug] Start initialisation.
 2017-09-06 22:30:16 [debug] Initialisation done.
@@ -90,6 +90,35 @@ MII...
 
         )
 
+    [EC] => Array
+        (
+            [cert] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+
+            [chain] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+
+            [key] => -----BEGIN EC PRIVATE KEY-----
+MHc...
+-----END EC PRIVATE KEY-----
+
+            [pem] => -----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MII...
+-----END CERTIFICATE-----
+-----BEGIN EC PRIVATE KEY-----
+MHc...
+-----END EC PRIVATE KEY-----
+-----BEGIN DH PARAMETERS-----
+MII...
+-----END DH PARAMETERS-----
+
+        )
+
     [dh] => -----BEGIN DH PARAMETERS-----
 MII...
 -----END DH PARAMETERS-----
@@ -103,7 +132,6 @@ Limitations
 
 * No revocation function
 * Only http-01 challenge support
-* Only RSA support
 
 Links
 ---------------------
