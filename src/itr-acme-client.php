@@ -300,6 +300,9 @@ class itrAcmeClient {
   public function signDomains(array $domains): array {
     $this->log('Starting certificate generation for domains', 'info');
 
+    // Reindex domains array for consistent access ($domains[0])
+    $domains = array_values($domains);
+
     // Only RSA Accounts are supported by mid 2017 at Let's Encrypt
     $keyType = 'RSA';
 
