@@ -118,16 +118,27 @@ class itrAcmeClient {
   ];
 
   /**
-   * @var string The key types of the certificates we want to create (currently RSA only)
+   * @var string The key types of the certificates we want to create
    */
   public $certKeyTypes = [
-    'RSA'
+    'RSA',
+    'EC'
   ];
 
   /**
    * @var string The key bit size of the certificate
    */
   public $certRsaKeyBits = 2048;
+
+  /**
+   * @var string The Curve to use for EC,
+   * Letsencrypt supports:
+   *   NIST P-256 (OpenSSL prime256v1);
+   *   NIST P-384 (OpenSSL secp384r1).
+   * Not supported by mid 2017
+   *   NIST P-521 (OpenSSL secp521r1)
+   */
+  public $certEcCurve = 'prime256v1';
 
   /**
    * @var string The Digest Algorithm
@@ -237,16 +248,16 @@ class itrAcmeClient {
 
     $this->log('Starting account registration', 'info');
 
-    $keyType = $this->certKeyTypes[0];
+    // Only RSA Accounts are supported by mid 2017 at Let's Encrypt
+    $keyType = 'RSA';
 
     if (is_file($this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key')) {
       $this->log('Account already exists', 'info');
       return true;
     }
 
-    // Generate the public + private key
-    $this->generateKey($this->certAccountDir);
-
+    // Generate the private key
+    $this->generateKey($this->certAccountDir, $keyType);
 
     // Build payload array
     $payload = [
@@ -284,7 +295,8 @@ class itrAcmeClient {
   public function signDomains(array $domains): array {
     $this->log('Starting certificate generation for domains', 'info');
 
-    $keyType = $this->certKeyTypes[0];
+    // Only RSA Accounts are supported by mid 2017 at Let's Encrypt
+    $keyType = 'RSA';
 
     // Load private account key
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
@@ -406,112 +418,116 @@ class itrAcmeClient {
       $certDir .= '/' . $domains[0];
     }
 
-    // Create new public private keys
-    $privateDomainKey = $this->generateKey();
+    // Initialise result variable
+    $pem = [];
 
-    // Generate a cerfication signing request for all domains
-    $csr = $this->generateCsr($privateDomainKey, $domains, $certDir);
+    // Create new public private keys for each keyType
+    foreach($this->certKeyTypes as $keyType) {
 
-    // Convert base64 to base64 url safe
-    preg_match('/REQUEST-----(.*)-----END/s', $csr, $matches);
-    $csr64 = trim(resthelper::base64url_encode(base64_decode($matches[1])));
+      $privateDomainKey = $this->generateKey(false, $keyType);
 
-    // request certificates creation
-    $this->signedRequest('/acme/new-cert', [
-      'resource' => 'new-cert',
-      'csr'      => $csr64
-    ]);
+      // Generate a cerfication signing request for all domains
+      $csr = $this->generateCsr($privateDomainKey, $domains, $certDir);
 
-    if ($this->lastResponse['status'] !== 201) {
-      throw new \RuntimeException('Invalid response code: ' . $this->lastResponse['status'] . ', ' . json_encode($result));
-    }
+      // Convert base64 to base64 url safe
+      preg_match('/REQUEST-----(.*)-----END/s', $csr, $matches);
+      $csr64 = trim(resthelper::base64url_encode(base64_decode($matches[1])));
 
-    // We need last location for later validation
-    preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
-    $certificateUrl = trim($matches[1]);
+      // request certificates creation
+      $this->signedRequest('/acme/new-cert', [
+        'resource' => 'new-cert',
+        'csr'      => $csr64
+      ]);
 
-    // Init variables
-    $certChain   = '';
-    $certificate = '';
+      if ($this->lastResponse['status'] !== 201) {
+        throw new \RuntimeException('Invalid response code: ' . $this->lastResponse['status'] . ', ' . json_encode($this->lastResponse));
+      }
 
-    // Check the status of the challenge, break after 90 seconds
-    for ($i = 0; $i < 60; $i++) {
+      // We need last location for later validation
+      preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
+      $certificateUrl = trim($matches[1]);
 
-      $this->lastResponse = RestHelper::get($certificateUrl);
+      // Init variables
+      $certChain   = '';
+      $certificate = '';
 
-      if ($this->lastResponse['status'] === 202) {
+      // Check the status of the challenge, break after 90 seconds
+      for ($i = 0; $i < 60; $i++) {
 
-        $this->log('Certificate generation is still pending...', 'info');
-        usleep(1500);
+        $this->lastResponse = RestHelper::get($certificateUrl);
 
-      } elseif ($this->lastResponse['status'] === 200) {
+        if ($this->lastResponse['status'] === 202) {
 
-        $this->log('Certificate generation complete.', 'info');
+          $this->log('Certificate generation is still pending...', 'info');
+          usleep(1500);
 
-        $cert64 = base64_encode($this->lastResponse['body']);
-        $cert64 = chunk_split($cert64, 64, chr(10));
+        } elseif ($this->lastResponse['status'] === 200) {
 
-        $certificate = '-----BEGIN CERTIFICATE-----' . chr(10) . $cert64 . '-----END CERTIFICATE-----' . chr(10);
+          $this->log('Certificate generation complete.', 'info');
 
-        // Load certificate chain
-        preg_match_all('/Link: <(.+)>;rel="up"/', $this->lastResponse['header'], $matches);
+          $cert64 = base64_encode($this->lastResponse['body']);
+          $cert64 = chunk_split($cert64, 64, chr(10));
 
-        // Build a 5 char long hash for certificate chain
-        $certChainHash = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
-        $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
+          $certificate = '-----BEGIN CERTIFICATE-----' . chr(10) . $cert64 . '-----END CERTIFICATE-----' . chr(10);
 
-        // Load certificate chain from file or from web
-        if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - ($this->certChainCache * 60 * 60)) {
-          $this->log('Load chain certificate from cache: ' . $certChainCacheFile, 'info');
-          $certChain = file_get_contents($certChainCacheFile);
-        } else {
-          $this->log('Load chain certificate from web, local cache does not exists or is expired', 'info');
+          // Load certificate chain
+          preg_match_all('/Link: <(.+)>;rel="up"/', $this->lastResponse['header'], $matches);
 
-          foreach ($matches[1] as $url) {
-            $this->log('Load chain cert from: ' . $url, 'info');
+          // Build a 5 char long hash for certificate chain
+          $certChainHash = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
+          $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
 
-            // Get certificate from webserver
-            $result = RestHelper::get($url);
+          // Load certificate chain from file or from web
+          if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - ($this->certChainCache * 60 * 60)) {
+            $this->log('Load chain certificate from cache: ' . $certChainCacheFile, 'info');
+            $certChain = file_get_contents($certChainCacheFile);
+          } else {
+            $this->log('Load chain certificate from web, local cache does not exists or is expired', 'info');
 
-            // Encode certificate to base64 url safe
-            if ($result['status'] === 200) {
-              $cert64 = base64_encode($result['body']);
-              $cert64 = chunk_split($cert64, 64, chr(10));
+            foreach ($matches[1] as $url) {
+              $this->log('Load chain cert from: ' . $url, 'info');
 
-              $certChain .= '-----BEGIN CERTIFICATE-----' . chr(10);
-              $certChain .= $cert64;
-              $certChain .= '-----END CERTIFICATE-----' . chr(10);
+              // Get certificate from webserver
+              $result = RestHelper::get($url);
+
+              // Encode certificate to base64 url safe
+              if ($result['status'] === 200) {
+                $cert64 = base64_encode($result['body']);
+                $cert64 = chunk_split($cert64, 64, chr(10));
+
+                $certChain .= '-----BEGIN CERTIFICATE-----' . chr(10);
+                $certChain .= $cert64;
+                $certChain .= '-----END CERTIFICATE-----' . chr(10);
+              }
             }
+
+            // Save certificate chain to cache file
+            @file_put_contents($certChainCacheFile, $certChain);
           }
 
-          // Save certificate chain to cache file
-          @file_put_contents($certChainCacheFile, $certChain);
+          // Break for loop
+          break;
+        } else {
+          $this->log('Certificate generation failed: Error code ' . $this->lastResponse['status'], 'critical');
+          throw new \RuntimeException('Certificate generation failed: Error code ' . $this->lastResponse['status'], 500);
         }
-
-        // Break for loop
-        break;
-      } else {
-        $this->log('Certificate generation failed: Error code ' . $this->lastResponse['status'], 'critical');
-        throw new \RuntimeException('Certificate generation failed: Error code ' . $this->lastResponse['status'], 500);
       }
-    }
 
-    if (empty($certificate)) {
-      $this->log('Certificate generation failed: Reason unkown!', 'critical');
-      throw new \RuntimeException('Certificate generation faild: Reason unkown!', 500);
-    }
+      if (empty($certificate)) {
+        $this->log('Certificate generation failed: Reason unkown!', 'critical');
+        throw new \RuntimeException('Certificate generation faild: Reason unkown!', 500);
+      }
 
-    foreach ($domains as $domain) {
-      $this->log('Successfuly created certificate for domain: ' . $domain, 'notice');
-    }
+      foreach ($domains as $domain) {
+        $this->log('Successfuly created certificate for domain: ' . $domain, 'notice');
+      }
 
-    $pem = [
-      $this->certKeyTypes[0] => [
-        'cert'  => $certificate,
-        'chain' => $certChain,
-        'key'   => $privateDomainKey
-      ]
-    ];
+      $pem[$keyType] = [
+          'cert'  => $certificate,
+          'chain' => $certChain,
+          'key'   => $privateDomainKey
+        ];
+    }
 
     if (!empty($this->dhParamFile)) {
       $pem['dh'] = $this->getDhParameters();
@@ -537,18 +553,27 @@ class itrAcmeClient {
    * Generate a new public private key pair and save it to the given directory
    *
    * @param string|bool $outputDir The directory for saveing the keys
+   * @param string $keyType The Key type we want to generate
    * @return string Private key
    */
-  protected function generateKey($outputDir = false): string {
+  protected function generateKey($outputDir = false, $keyType='RSA'): string {
 
-    $this->log('Starting key generation.', 'info');
+    $this->log('Starting key generation:', 'info');
 
-    $keyType = $this->certKeyTypes[0];
-
-    $configargs = [
-      'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
-      'private_key_bits' => $this->certRsaKeyBits
-    ];
+    // Different Log messages and configuration for RSA and EC
+    if ($keyType === 'RSA') {
+        $this->log('Key Type: ' . $keyType . ' Bits: ' . $this->certRsaKeyBits, 'info');
+        $configargs = [
+            'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
+            'private_key_bits' => $this->certRsaKeyBits
+        ];
+    } else {
+        $this->log('Key Type: ' . $keyType . ' Curve: ' . $this->certEcCurve, 'info');
+        $configargs = [
+            'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
+            'curve_name'       => $this->certEcCurve
+        ];
+    }
 
     // create the certificate key
     $key = openssl_pkey_new($configargs);
@@ -658,7 +683,8 @@ class itrAcmeClient {
 
     $this->log('Start signing request', 'info');
 
-    $keyType = $this->certKeyTypes[0];
+    // Only RSA Accounts are supported by mid 2017 at Let's Encrypt
+    $keyType = 'RSA';
 
     // Load private account key
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
@@ -672,14 +698,26 @@ class itrAcmeClient {
     $privateKeyDetails = openssl_pkey_get_details($privateAccountKey);
 
     // Build header object for request
-    $header = [
-      'alg' => 'RS256',
-      'jwk' => [
-        'kty' => 'RSA',
-        'n'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['n']),
-        'e'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['e'])
-      ]
-    ];
+    if ($privateKeyDetails['type'] === OPENSSL_KEYTYPE_EC) {
+        $header = [
+          'alg' => 'ES256',
+          'jwk' => [
+            'kty' => 'EC',
+            "crv" => "P-256",
+            'x'   => RestHelper::base64url_encode($privateKeyDetails['ec']['x']),
+            'y'   => RestHelper::base64url_encode($privateKeyDetails['ec']['y'])
+          ]
+        ];
+    } else {
+        $header = [
+          'alg' => 'RS256',
+          'jwk' => [
+            'kty' => 'RSA',
+            'n'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['n']),
+            'e'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['e'])
+          ]
+        ];
+    }
 
     $protected = $header;
 
@@ -700,7 +738,7 @@ class itrAcmeClient {
     $protected64 = RestHelper::base64url_encode(json_encode($protected));
 
     // Sign payload and header with private key and base64 encode it
-    openssl_sign($protected64 . '.' . $payload64, $signed, $privateAccountKey, 'SHA256');
+    openssl_sign($protected64 . '.' . $payload64, $signed, $privateAccountKey, OPENSSL_ALGO_SHA256);
     $signed64 = RestHelper::base64url_encode($signed);
 
     $data = [
