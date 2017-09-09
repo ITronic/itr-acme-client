@@ -146,6 +146,11 @@ class itrAcmeClient {
   public $dhParamFile = 'dh2048.pem';
 
   /**
+   * @var string The Elliptic Curve File, if relative we use the $certAccountDir, if empty don't create it
+   */
+  public $ecParamFile = 'ecprime256v1.pem';
+
+  /**
    * @var string The root directory of the domain
    */
   public $webRootDir = '/var/www/html';
@@ -504,19 +509,16 @@ class itrAcmeClient {
         ];
     }
 
-    if (!empty($this->dhParamFile)) {
-      $pem['dh'] = $this->getDhParameters();
+    if ($keyType == 'RSA' && !empty($this->dhParamFile)) {
+      $pem[$keyType]['dhparams'] = $this->getDhParameters();
+    }
+
+    if ($keyType == 'EC' && !empty($this->ecParamFile)) {
+      $pem[$keyType]['ecparams'] = $this->getEcParameters();
     }
 
     foreach ($pem as $keyType => $files) {
-
-      if ($keyType === 'dh') continue;
-
       $pem[$keyType]['pem'] = implode('', $files);
-
-      if (isset($pem['dh'])) {
-        $pem[$keyType]['pem'] .= $pem['dh'];
-      }
     }
 
     $this->log('Certificate generation finished.', 'info');
@@ -643,6 +645,72 @@ class itrAcmeClient {
 
     // Write Parameters to file, ignore if location is not writeable
     @file_put_contents($dhParamFile, $pem);
+
+    return $pem;
+  }
+
+  /**
+   * Generate Elliptic Curve Parameters
+   *
+   * @param string $curve The name of the curve
+   * @return string The Diffie-Hellman Parameters as pem
+   */
+  public function getEcParameters(string $curve = 'prime256v1'): string {
+
+    if (substr($this->ecParamFile, 0, 1) === '/') {
+      $ecParamFile = $this->ecParamFile;
+    } else {
+      $ecParamFile = $this->certAccountDir . '/' . $this->ecParamFile;
+    }
+
+    // If file already exists, return its content
+    if (file_exists($ecParamFile)) {
+      $this->log('Elliptic Curve Parameters already exists.', 'info');
+      return file_get_contents($ecParamFile);
+    }
+
+    $ret            = 255;
+    $descriptorspec = [
+      // stdin is a pipe that the child will read from
+      0 => [
+        'pipe',
+        'r'
+      ],
+      // stdout is a pipe that the child will write to
+      1 => [
+        'pipe',
+        'w'
+      ],
+      // Write progress to stdout
+      2 => STDOUT
+    ];
+
+    // Start openssl process to generate Elliptic Curve Parameters
+    $this->log('Start generate Elliptic Curve Parameters', 'info');
+    $process = proc_open('openssl ecparam -name ' . $curve, $descriptorspec, $pipes);
+
+    // If process started successfully we get resource, we close input pipe and load the content of the output pipe
+    if (is_resource($process)) {
+      fclose($pipes[0]);
+
+      $pem = stream_get_contents($pipes[1]);
+      fclose($pipes[1]);
+
+      // It is important that you close any pipes before calling
+      // proc_close in order to avoid a deadlock
+      $ret = proc_close($process);
+    }
+
+    // On error fail
+    if ($ret > 0) {
+      $this->log('Failed to generate Elliptic Curve Parameters', 'critical');
+      throw new \RuntimeException('Failed to generate Elliptic Curve Parameters', 500);
+    }
+
+    $this->log('Elliptic Curve Parameters generation finished.', 'info');
+
+    // Write Parameters to file, ignore if location is not writeable
+    @file_put_contents($ecParamFile, $pem);
 
     return $pem;
   }
