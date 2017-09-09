@@ -448,19 +448,39 @@ class itrAcmeClient {
 
         $certificate = '-----BEGIN CERTIFICATE-----' . chr(10) . $cert64 . '-----END CERTIFICATE-----' . chr(10);
 
-        // Load chain certificates
+        // Load certificate chain
         preg_match_all('/Link: <(.+)>;rel="up"/', $this->lastResponse['header'], $matches);
-        foreach ($matches[1] as $url) {
-          $this->log('Load chain cert from: ' . $url, 'info');
 
-          $result = RestHelper::get($url);
+        // Build a 5 char long hash for certificate chain
+        $certChainHash = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
+        $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
 
-          if ($result['status'] === 200) {
-            $cert64 = base64_encode($result['body']);
-            $cert64 = chunk_split($cert64, 64, chr(10));
+        // Load certificate chain from file or from web
+        if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - 86400) {
+          $this->log('Load chain certificate from cache: ' . $certChainCacheFile, 'info');
+          $certChain = file_get_contents($certChainCacheFile);
+        } else {
+          $this->log('Load chain certificate from web, local cache does not exists or is expired', 'info');
 
-            $certChain .= '-----BEGIN CERTIFICATE-----' . chr(10) . $cert64 . '-----END CERTIFICATE-----' . chr(10);
+          foreach ($matches[1] as $url) {
+            $this->log('Load chain cert from: ' . $url, 'info');
+
+            // Get certificate from webserver
+            $result = RestHelper::get($url);
+
+            // Encode certificate to base64 url safe
+            if ($result['status'] === 200) {
+              $cert64 = base64_encode($result['body']);
+              $cert64 = chunk_split($cert64, 64, chr(10));
+
+              $certChain .= '-----BEGIN CERTIFICATE-----' . chr(10);
+              $certChain .= $cert64;
+              $certChain .= '-----END CERTIFICATE-----' . chr(10);
+            }
           }
+
+          // Save certificate chain to cache file
+          @file_put_contents($certChainCacheFile, $certChain);
         }
 
         // Break for loop
