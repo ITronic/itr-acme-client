@@ -1001,6 +1001,9 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    */
   public function validateDomainControl(string $domain): bool {
 
+    // Store verify-hash
+    $verify_hash = hash('SHA1', $domain . $_SERVER['REQUEST_TIME_FLOAT']);
+
     // Get Well-known Path and create it if it doesn't exists
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
 
@@ -1012,28 +1015,31 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
       }
     }
 
-    // Save local_check.txt to the Well-Known Path
-    $this->itrAcmeClient->log('Try saving local to: ' . $domainWellKnownPath . '/local_check.txt', 'debug');
+    // Extend well know-path with filename
+    $domainWellKnownPath .= '/' . $verify_hash . '.txt';
 
-    if (!file_put_contents($domainWellKnownPath . '/local_check.txt', 'OK')) {
-      throw new \RuntimeException('Cannot create local check file at ' . $domainWellKnownPath . '/local_check.txt', 500);
+    // Save local_check.txt to the Well-Known Path
+    $this->itrAcmeClient->log('Try saving local to: ' . $domainWellKnownPath, 'debug');
+
+    if (!file_put_contents($domainWellKnownPath, $verify_hash)) {
+      throw new \RuntimeException('Cannot create local check file at ' . $domainWellKnownPath, 500);
     }
 
     // Set webserver compatible permissions
-    chmod($domainWellKnownPath . '/local_check.txt', $this->itrAcmeClient->webServerFilePerm);
+    chmod($domainWellKnownPath, $this->itrAcmeClient->webServerFilePerm);
 
     // Validate local_check.txt over http
     // Disable server ssl verification, its possible that the certificate is invalid or expired but we don't care
     RestHelper::$verfiySsl = false;
-    $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/local_check.txt');
+    $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt');
     RestHelper::$verfiySsl = true;
 
     // Cleanup before validation because we want a clean directory if we fail validating
-    unlink($domainWellKnownPath . '/local_check.txt');
+    unlink($domainWellKnownPath);
 
     // Check for http error or wrong body contant
-    if ($response['body'] !== 'OK') {
-      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/local_check.txt', 500);
+    if ($response['body'] !== $verify_hash) {
+      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt (' . serialize($response) . ')', 500);
     }
 
     return true;
@@ -1066,10 +1072,16 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
     // Save the token with the fingerpint in the well-known path and set file rights
-    file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody);
+    if(file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody) === false)
+    {
+     throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
+    }
 
     // Set webserver compatible permissions
-    chmod($domainWellKnownPath . '/' . $challenge['token'], $this->itrAcmeClient->webServerFilePerm);
+    if(chmod($domainWellKnownPath . '/' . $challenge['token'], $this->itrAcmeClient->webServerFilePerm) === false)
+    {
+     throw new \RuntimeException('Failed to set permissions: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
+    }
 
     // Validate that challenge repsonse is reachable
     $challengeResponseUrl = 'http://' . $domain . '/.well-known/acme-challenge/' . $challenge['token'];
