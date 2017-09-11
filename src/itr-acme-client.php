@@ -1215,11 +1215,22 @@ class RestHelper {
         'Content-Type: application/json'
       ],
       CURLOPT_HEADER         => 1,
-      CURLOPT_SSL_VERIFYPEER => self::$verfiySsl === true ? 1 : 0,
-      CURLOPT_SSL_VERIFYHOST => self::$verfiySsl === true ? 2 : 0,
-      CURLOPT_HTTPAUTH       => !empty(self::$username) ? CURLAUTH_BASIC : CURLAUTH_NONE,
-      CURLOPT_USERPWD        => self::$username . ':' . self::$password
+      CURLOPT_FOLLOWLOCATION => 1,
     ]);
+
+    if (!empty(self::$username)) {
+      curl_setopt_array($curl, [
+        CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
+        CURLOPT_USERPWD        => self::$username . ':' . self::$password
+      ]);
+    }
+
+    if (self::$verfiySsl !== true) {
+      curl_setopt_array($curl, [
+        CURLOPT_SSL_VERIFYPEER => 1,
+        CURLOPT_SSL_VERIFYHOST => 2
+      ]);
+    }
 
     return $curl;
   }
