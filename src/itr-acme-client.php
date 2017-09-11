@@ -432,7 +432,7 @@ class itrAcmeClient {
     $pem = [];
 
     // Create new public private keys for each keyType
-    foreach($this->certKeyTypes as $keyType) {
+    foreach ($this->certKeyTypes as $keyType) {
 
       $privateDomainKey = $this->generateKey(false, $keyType);
 
@@ -484,7 +484,7 @@ class itrAcmeClient {
           preg_match_all('/Link: <(.+)>;rel="up"/', $this->lastResponse['header'], $matches);
 
           // Build a 5 char long hash for certificate chain
-          $certChainHash = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
+          $certChainHash      = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
           $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
 
           // Load certificate chain from file or from web
@@ -533,10 +533,10 @@ class itrAcmeClient {
       }
 
       $pem[$keyType] = [
-          'cert'  => $certificate,
-          'chain' => $certChain,
-          'key'   => $privateDomainKey
-        ];
+        'cert'  => $certificate,
+        'chain' => $certChain,
+        'key'   => $privateDomainKey
+      ];
     }
 
     if ($keyType == 'RSA' && !empty($this->dhParamFile)) {
@@ -563,23 +563,23 @@ class itrAcmeClient {
    * @param string $keyType The Key type we want to generate
    * @return string Private key
    */
-  protected function generateKey($outputDir = false, $keyType='RSA'): string {
+  protected function generateKey($outputDir = false, $keyType = 'RSA'): string {
 
     $this->log('Starting key generation:', 'info');
 
     // Different Log messages and configuration for RSA and EC
     if ($keyType === 'RSA') {
-        $this->log('Key Type: ' . $keyType . ' Bits: ' . $this->certRsaKeyBits, 'info');
-        $configargs = [
-            'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
-            'private_key_bits' => $this->certRsaKeyBits
-        ];
+      $this->log('Key Type: ' . $keyType . ' Bits: ' . $this->certRsaKeyBits, 'info');
+      $configargs = [
+        'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
+        'private_key_bits' => $this->certRsaKeyBits
+      ];
     } else {
-        $this->log('Key Type: ' . $keyType . ' Curve: ' . $this->certEcCurve, 'info');
-        $configargs = [
-            'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
-            'curve_name'       => $this->certEcCurve
-        ];
+      $this->log('Key Type: ' . $keyType . ' Curve: ' . $this->certEcCurve, 'info');
+      $configargs = [
+        'private_key_type' => constant('OPENSSL_KEYTYPE_' . $keyType),
+        'curve_name'       => $this->certEcCurve
+      ];
     }
 
     // create the certificate key
@@ -772,24 +772,24 @@ class itrAcmeClient {
 
     // Build header object for request
     if ($privateKeyDetails['type'] === OPENSSL_KEYTYPE_EC) {
-        $header = [
-          'alg' => 'ES256',
-          'jwk' => [
-            'kty' => 'EC',
-            "crv" => "P-256",
-            'x'   => RestHelper::base64url_encode($privateKeyDetails['ec']['x']),
-            'y'   => RestHelper::base64url_encode($privateKeyDetails['ec']['y'])
-          ]
-        ];
+      $header = [
+        'alg' => 'ES256',
+        'jwk' => [
+          'kty' => 'EC',
+          "crv" => "P-256",
+          'x'   => RestHelper::base64url_encode($privateKeyDetails['ec']['x']),
+          'y'   => RestHelper::base64url_encode($privateKeyDetails['ec']['y'])
+        ]
+      ];
     } else {
-        $header = [
-          'alg' => 'RS256',
-          'jwk' => [
-            'kty' => 'RSA',
-            'n'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['n']),
-            'e'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['e'])
-          ]
-        ];
+      $header = [
+        'alg' => 'RS256',
+        'jwk' => [
+          'kty' => 'RSA',
+          'n'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['n']),
+          'e'   => RestHelper::base64url_encode($privateKeyDetails['rsa']['e'])
+        ]
+      ];
     }
 
     $protected = $header;
@@ -1040,12 +1040,16 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     chmod($domainWellKnownPath, $this->itrAcmeClient->webServerFilePerm);
 
     // Validate over http and disable ssl verification because this is just a safety check
-    RestHelper::$verfiySsl = false;
-    $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt');
-    RestHelper::$verfiySsl = true;
-
-    // Cleanup before validation because we want a clean directory if we fail validating
-    unlink($domainWellKnownPath);
+    try {
+      RestHelper::$verifySsl = false;
+      $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt');
+      RestHelper::$verifySsl = true;
+    } catch (Throwable $exception) {
+      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt - ' . (string)$exception, 500);
+    } // We always want a clean directory
+    finally {
+      unlink($domainWellKnownPath);
+    }
 
     // Check for http error or wrong body contant
     if ($response['body'] !== $verify_hash) {
@@ -1082,15 +1086,13 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
     // Save the token with the fingerpint in the well-known path and set file permissions
-    if(file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody) === false)
-    {
-     throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
+    if (file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody) === false) {
+      throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
     }
 
     // Set webserver compatible permissions
-    if(chmod($domainWellKnownPath . '/' . $challenge['token'], $this->itrAcmeClient->webServerFilePerm) === false)
-    {
-     throw new \RuntimeException('Failed to set permissions: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
+    if (chmod($domainWellKnownPath . '/' . $challenge['token'], $this->itrAcmeClient->webServerFilePerm) === false) {
+      throw new \RuntimeException('Failed to set permissions: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
     }
 
     // Validate that challenge repsonse is reachable
@@ -1098,9 +1100,13 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
 
     if (!$this->itrAcmeClient->disableValidation) {
       // Disable server ssl verification, its possible that the certificate is invalid or expired but we don't care
-      RestHelper::$verfiySsl = false;
-      $result                = RestHelper::get($challengeResponseUrl);
-      RestHelper::$verfiySsl = true;
+      try {
+        RestHelper::$verifySsl = false;
+        $result                = RestHelper::get($challengeResponseUrl);
+        RestHelper::$verifySsl = true;
+      } catch (Throwable $exception) {
+        throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl . ' - ' . (string)$exception, 500);
+      }
 
       if ($result['body'] != $challengeBody) {
         throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl, 500);
@@ -1144,7 +1150,7 @@ class RestHelper {
   static $password;
 
   /** @var bool Check for trusted PEER and HOSTNAME */
-  static $verfiySsl = true;
+  static $verifySsl = true;
 
   /**
    * Call the url as GET
@@ -1244,12 +1250,12 @@ class RestHelper {
 
     if (!empty(self::$username)) {
       curl_setopt_array($curl, [
-        CURLOPT_HTTPAUTH       => CURLAUTH_BASIC,
-        CURLOPT_USERPWD        => self::$username . ':' . self::$password
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_USERPWD  => self::$username . ':' . self::$password
       ]);
     }
 
-    if (self::$verfiySsl === false) {
+    if (self::$verifySsl === false) {
       curl_setopt_array($curl, [
         CURLOPT_SSL_VERIFYPEER => 0
       ]);
@@ -1269,14 +1275,12 @@ class RestHelper {
   public static function execCurl($curl, string $return = 'print') {
 
     $data = curl_exec($curl);
-    if($data === false)
-    {
-     throw new \RuntimeException(curl_error($curl), 500);
+    if ($data === false) {
+      throw new \RuntimeException(curl_error($curl), 500);
     }
     $info = curl_getinfo($curl);
-    if($info === false)
-    {
-     throw new \RuntimeException(curl_error($curl), 500);
+    if ($info === false) {
+      throw new \RuntimeException(curl_error($curl), 500);
     }
     curl_close($curl);
 
