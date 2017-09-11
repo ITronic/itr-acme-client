@@ -1,5 +1,7 @@
 <?php
 /**
+ * ITronic ACME Client
+ *
  * @package itr-acme-client
  * @link http://itronic.at
  * @copyright Copyright (C) 2017 ITronic Harald Leithner.
@@ -232,7 +234,7 @@ class itrAcmeClient {
       throw new \RuntimeException('Contact information has not been changed!', 400);
     }
 
-    // Create the challengeManager if its not already an object
+    // Create the challengeManager if it's not already an object
     if (is_string($this->challengeManager)) {
       $this->challengeManager                = new $this->challengeManager;
       $this->challengeManager->itrAcmeClient = $this;
@@ -950,6 +952,9 @@ class itrAcmeClient {
   }
 }
 
+/**
+ * interface itrAcmeChallengeManager
+ */
 interface itrAcmeChallengeManager {
 
 
@@ -973,6 +978,9 @@ interface itrAcmeChallengeManager {
 
 }
 
+/**
+ * class itrAcmeChallengeManagerClass
+ */
 abstract class itrAcmeChallengeManagerClass implements itrAcmeChallengeManager {
   /**
    * @var itrAcmeClient The itrAcmeClient Object
@@ -985,6 +993,9 @@ abstract class itrAcmeChallengeManagerClass implements itrAcmeChallengeManager {
   public $type = '';
 }
 
+/**
+ * class itrAcmeChallengeManagerHttp
+ */
 class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
 
   /**
@@ -1004,7 +1015,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     // Store verify-hash
     $verify_hash = hash('SHA1', $domain . $_SERVER['REQUEST_TIME_FLOAT']);
 
-    // Get Well-known Path and create it if it doesn't exists
+    // Get well-known path and create it when needed
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
 
     if (!is_dir($domainWellKnownPath)) {
@@ -1015,10 +1026,10 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
       }
     }
 
-    // Extend well know-path with filename
+    // Extend well-known path with filename
     $domainWellKnownPath .= '/' . $verify_hash . '.txt';
 
-    // Save local_check.txt to the Well-Known Path
+    // Save validation file to the well-known path
     $this->itrAcmeClient->log('Try saving local to: ' . $domainWellKnownPath, 'debug');
 
     if (!file_put_contents($domainWellKnownPath, $verify_hash)) {
@@ -1028,8 +1039,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     // Set webserver compatible permissions
     chmod($domainWellKnownPath, $this->itrAcmeClient->webServerFilePerm);
 
-    // Validate local_check.txt over http
-    // Disable server ssl verification, its possible that the certificate is invalid or expired but we don't care
+    // Validate over http and disable ssl verification because this is just a safety check
     RestHelper::$verfiySsl = false;
     $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt');
     RestHelper::$verfiySsl = true;
@@ -1071,7 +1081,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     // compile challenge token and base64 encoded hash togather
     $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
-    // Save the token with the fingerpint in the well-known path and set file rights
+    // Save the token with the fingerpint in the well-known path and set file permissions
     if(file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody) === false)
     {
      throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
@@ -1107,6 +1117,8 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
   }
 
   /**
+   * Remove challenge response file
+   *
    * @param string $domain
    * @param array $challenge
    * @return void
