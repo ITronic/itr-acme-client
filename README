@@ -6,7 +6,7 @@ This library implements the ACME 1.0 draft 04 protocol (https://tools.ietf.org/h
 Requirements
 ---------------------
 
-* PHP 7.0+ (For EC certificates 7.1+)
+* PHP 7.1+
 * Openssl 1.0+
 * Curl
 

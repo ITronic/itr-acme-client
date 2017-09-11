@@ -752,7 +752,7 @@ class itrAcmeClient {
    * @param array $payload The payload to send
    * @return void
    */
-  public function signedRequest(string $uri, array $payload) {
+  public function signedRequest(string $uri, array $payload): void {
 
     $this->log('Start signing request', 'info');
 
@@ -943,7 +943,7 @@ class itrAcmeClient {
    * @param string $level The log level used for Pse logging
    * @return void
    */
-  public function log(string $message, string $level = 'info') {
+  public function log(string $message, string $level = 'info'): void {
     if ($this->logger) {
       $this->logger->log($level, $message);
     } else {
@@ -1129,7 +1129,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    * @param array $challenge
    * @return void
    */
-  public function cleanupChallenge(string $domain, array $challenge) {
+  public function cleanupChallenge(string $domain, array $challenge): void {
     // get the well-known path, we know that it already exists and we can write to it
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
 
