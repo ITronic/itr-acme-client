@@ -1237,7 +1237,7 @@ class RestHelper {
       ]);
     }
 
-    if (self::$verfiySsl !== false) {
+    if (self::$verfiySsl === false) {
       curl_setopt_array($curl, [
         CURLOPT_SSL_VERIFYPEER => 0
       ]);
