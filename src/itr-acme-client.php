@@ -189,6 +189,11 @@ class itrAcmeClient {
   private $lastResponse;
 
   /**
+   * @var bool Initialisation done.
+   */
+  private $initDone = false;
+
+  /**
    * Initialise the object
    *
    * @return bool True if everything is ok
@@ -199,14 +204,12 @@ class itrAcmeClient {
     // check if we are already initialised
     $this->log('Start initialisation.', 'debug');
 
-    static $done = false;
-
-    if ($done) {
+    if ($this->initDone) {
       $this->log('Object already initialised.', 'critical');
       throw new \RuntimeException('Object already initialised!', 500);
     }
 
-    $done = true;
+    $this->initDone = true;
 
     // build and clean up variables
     rtrim($this->certDir, '/');
