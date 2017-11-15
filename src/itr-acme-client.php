@@ -557,7 +557,7 @@ class itrAcmeClient {
       }
 
       foreach ($domains as $domain) {
-        $this->log('Successfuly created certificate for domain: ' . $domain, 'notice');
+	      $this->log('Successfuly created ' . $keyType . ' certificate for domain: ' . $domain, 'notice');
       }
 
       $pem[$keyType] = [
