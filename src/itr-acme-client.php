@@ -54,6 +54,23 @@ class itrAcmeClient {
    */
   public $caTesting = 'https://acme-staging.api.letsencrypt.org';
 
+	/**
+	 * @var string The url to the directory relative to the $ca
+	 */
+	public $directoryUrl = '/directory';
+
+	/**
+	 * @var array The directory of the ACME implementation
+	 */
+	public $directory = [
+		'new-authz' => '',
+		'new-cert' => '',
+		'new-reg' => '',
+		'meta' => [
+			'terms-of-service' => ''
+		]
+	];
+
   /**
    * @var bool Disable builtin valiation if we control domains
    */
@@ -63,11 +80,6 @@ class itrAcmeClient {
    * @var string|itrAcmeChallengeManagerHttp The challenge Manager class or an itrAcmeChallengeManagerHttp object
    */
   public $challengeManager = 'itrAcmeChallengeManagerHttp';
-
-  /**
-   * @var string The CA Subscriber Agreement
-   */
-  public $agreement = 'https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf';
 
   /** Certificate Information */
 
@@ -177,7 +189,6 @@ class itrAcmeClient {
    */
   public $appendWellKnownPath = true;
 
-
   /**
    * @var \Psr\Log\LoggerInterface|null The logger to use, loglevel is always info
    */
@@ -243,11 +254,25 @@ class itrAcmeClient {
       $this->challengeManager->itrAcmeClient = $this;
     }
 
+		// Request the directory
+		$this->lastResponse = RestHelper::get($this->ca . $this->directoryUrl);
+		$this->directory = json_decode($this->lastResponse['body'], true);
+
+		// Validate directory
+		if (!is_array($this->directory) ||
+			!array_key_exists('new-authz', $this->directory) ||
+			!array_key_exists('new-cert', $this->directory) ||
+			!array_key_exists('new-reg', $this->directory)
+		) {
+
+			$this->log('Directory information are incomplete!', 'exception');
+			throw new \RuntimeException('Directory information are incomplete!', 400);
+		}
+
     $this->log('Initialisation done.', 'debug');
 
     return true;
   }
-
 
   /**
    * Create a private and public key pair and register the account
@@ -275,8 +300,8 @@ class itrAcmeClient {
     ];
 
     // Add Subscriber Agreement
-    if (!empty($this->agreement)) {
-      $payload['agreement'] = $this->agreement;
+		if (!empty($this->directory['meta']['terms-of-service'])) {
+			$payload['agreement'] = $this->directory['meta']['terms-of-service'];
     }
 
     // Add contact information if exists
@@ -284,7 +309,7 @@ class itrAcmeClient {
       $payload['contact'] = (array)$this->contact;
     }
 
-    $this->signedRequest('/acme/new-reg', $payload);
+		$this->signedRequest($this->directory['new-reg'], $payload);
 
     if ($this->lastResponse['status'] !== 201) {
       $this->log('Account registration failed: ' . $this->lastResponse['status'], 'exception');
@@ -347,7 +372,7 @@ class itrAcmeClient {
       $this->log('Requesting challenges for domain ' . $domain, 'info');
 
       // Get available challenge methods for domain
-      $this->signedRequest('/acme/new-authz', [
+			$this->signedRequest($this->directory['new-authz'], [
         'resource'   => 'new-authz',
         'identifier' => [
           'type'  => 'dns',
@@ -447,7 +472,7 @@ class itrAcmeClient {
       $csr64 = trim(resthelper::base64url_encode(base64_decode($matches[1])));
 
       // request certificates creation
-      $this->signedRequest('/acme/new-cert', [
+			$this->signedRequest($this->directory['new-cert'], [
         'resource' => 'new-cert',
         'csr'      => $csr64
       ]);
@@ -960,7 +985,6 @@ class itrAcmeClient {
  */
 interface itrAcmeChallengeManager {
 
-
   /**
    * This function validates if we control the domain so we can complete the challenge
    *
@@ -1120,7 +1144,6 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
       $this->itrAcmeClient->log('Token should be available at ' . $challengeResponseUrl, 'info');
     }
 
-
     return $challengeBody;
 
   }
@@ -1139,7 +1162,6 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     unlink($domainWellKnownPath . '/' . $challenge['token']);
   }
 }
-
 
 /**
  * Class RestHelper
