@@ -205,7 +205,7 @@ class itrAcmeClient {
     $this->log('Start initialisation.', 'debug');
 
     if ($this->initDone) {
-      $this->log('Object already initialised.', 'critical');
+      $this->log('Object already initialised.', 'exception');
       throw new \RuntimeException('Object already initialised!', 500);
     }
 
@@ -233,7 +233,7 @@ class itrAcmeClient {
 
     // Check if default contact information has been changed
     if (is_array($this->certAccountContact) && (in_array('mailto:cert-admin@example.com', $this->certAccountContact) || in_array('tel:+12025551212', $this->certAccountContact))) {
-      $this->log('Contact information has not been changed!', 'critical');
+      $this->log('Contact information has not been changed!', 'exception');
       throw new \RuntimeException('Contact information has not been changed!', 400);
     }
 
@@ -287,7 +287,7 @@ class itrAcmeClient {
     $this->signedRequest('/acme/new-reg', $payload);
 
     if ($this->lastResponse['status'] !== 201) {
-      $this->log('Account registration failed: ' . $this->lastResponse['status'], 'critical');
+      $this->log('Account registration failed: ' . $this->lastResponse['status'], 'exception');
       throw new \RuntimeException('Account registration failed: ' . $this->lastResponse['status'], 500);
     }
 
@@ -315,7 +315,7 @@ class itrAcmeClient {
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
-      $this->log('Cannot read private account key: ' . openssl_error_string(), 'critical');
+      $this->log('Cannot read private account key: ' . openssl_error_string(), 'exception');
       throw new \RuntimeException('Cannot read private account key: ' . openssl_error_string(), 500);
     }
 
@@ -334,7 +334,7 @@ class itrAcmeClient {
             throw new \RuntimeException('Failed to validate control of ' . $domain, 500);
           }
         } catch (\RuntimeException $e) {
-          $this->log($e->getMessage(), 'critical');
+          $this->log($e->getMessage(), 'exception');
           throw $e;
         }
       }
@@ -356,7 +356,7 @@ class itrAcmeClient {
       ]);
 
       if ($this->lastResponse['status'] !== 201) {
-        $this->log('Error getting available challenges for Domain ' . $domain, 'critical');
+        $this->log('Error getting available challenges for Domain ' . $domain, 'exception');
         throw new \RuntimeException('Error getting available challenges for Domain ' . $domain, 500);
       }
 
@@ -372,7 +372,7 @@ class itrAcmeClient {
         }
       }
       if (!$challenge) {
-        $this->log('Error cannot find compatible challange for Domain ' . $domain, 'critical');
+        $this->log('Error cannot find compatible challange for Domain ' . $domain, 'exception');
         throw new \RuntimeException('Error cannot find compatible challange for Domain ' . $domain, 500);
       }
 
@@ -411,7 +411,7 @@ class itrAcmeClient {
       // Check if we finished the challenge successfuly, if not cleanup and throw an exception
       if ($this->lastResponse['json']['status'] !== 'valid') {
         $this->challengeManager->cleanupChallenge($domain, $challenge);
-        $this->log('Verification Status: ' . $this->lastResponse['json']['status'] . ' Repsonse: ' . $this->lastResponse['body'], 'critical');
+        $this->log('Verification Status: ' . $this->lastResponse['json']['status'] . ' Repsonse: ' . $this->lastResponse['body'], 'exception');
         throw new \RuntimeException('Verification Status: ' . $this->lastResponse['json']['status'] . ' Repsonse: ' . $this->lastResponse['body'], 500);
       }
 
@@ -521,13 +521,13 @@ class itrAcmeClient {
           // Break for loop
           break;
         } else {
-          $this->log('Certificate generation failed: Error code ' . $this->lastResponse['status'], 'critical');
+          $this->log('Certificate generation failed: Error code ' . $this->lastResponse['status'], 'exception');
           throw new \RuntimeException('Certificate generation failed: Error code ' . $this->lastResponse['status'], 500);
         }
       }
 
       if (empty($certificate)) {
-        $this->log('Certificate generation failed: Reason unkown!', 'critical');
+        $this->log('Certificate generation failed: Reason unkown!', 'exception');
         throw new \RuntimeException('Certificate generation faild: Reason unkown!', 500);
       }
 
@@ -590,7 +590,7 @@ class itrAcmeClient {
 
     // Extract the new private key
     if (!openssl_pkey_export($key, $privateKey)) {
-      $this->log('Private key export failed.', 'critical');
+      $this->log('Private key export failed.', 'exception');
       throw new \RuntimeException('Private key export failed!', 500);
     }
 
@@ -601,13 +601,13 @@ class itrAcmeClient {
         @mkdir($outputDir, 0700, true);
 
         if (!is_dir($outputDir)) {
-          $this->log('Failed to create output directory: ' . $outputDir, 'critical');
+          $this->log('Failed to create output directory: ' . $outputDir, 'exception');
           throw new \RuntimeException('Failed to create output directory: ' . $outputDir, 500);
         }
       }
 
       if (!is_writable($outputDir) || file_put_contents($outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', $privateKey) === false) {
-        $this->log('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 'critical');
+        $this->log('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 'exception');
         throw new \RuntimeException('Failed to create private key file: ' . $outputDir . '/' . $this->getKeyPrefix($keyType) . 'private.key', 500);
       }
     }
@@ -670,7 +670,7 @@ class itrAcmeClient {
 
     // On error fail
     if ($ret > 0) {
-      $this->log('Failed to generate Diffie-Hellman Parameters', 'critical');
+      $this->log('Failed to generate Diffie-Hellman Parameters', 'exception');
       throw new \RuntimeException('Failed to generate Diffie-Hellman Parameters', 500);
     }
 
@@ -735,10 +735,10 @@ class itrAcmeClient {
     }
 
     // On error fail
-    if ($ret > 0) {
-      $this->log('Failed to generate Elliptic Curve Parameters', 'critical');
-      throw new \RuntimeException('Failed to generate Elliptic Curve Parameters', 500);
-    }
+	  if ($ret > 0) {
+		  $this->log('Failed to generate Elliptic Curve Parameters', 'exception');
+		  throw new \RuntimeException('Failed to generate Elliptic Curve Parameters', 500);
+	  }
 
     $this->log('Elliptic Curve Parameters generation finished.', 'info');
 
@@ -766,7 +766,7 @@ class itrAcmeClient {
     $privateAccountKey = openssl_pkey_get_private('file://' . $this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key');
 
     if ($privateAccountKey === false) {
-      $this->log('Cannot read private account key: ' . openssl_error_string(), 'critical');
+      $this->log('Cannot read private account key: ' . openssl_error_string(), 'exception');
       throw new \RuntimeException('Cannot read private account key: ' . openssl_error_string(), 500);
     }
 
@@ -805,7 +805,7 @@ class itrAcmeClient {
     if (preg_match('/Replay\-Nonce: (.+)/i', $this->lastResponse['header'], $matches)) {
       $protected['nonce'] = trim($matches[1]);
     } else {
-      $this->log('Could not get Nonce!', 'critical');
+      $this->log('Could not get Nonce!', 'exception');
       throw new \RuntimeException('Could not get Nonce!', 500);
     }
 
@@ -886,7 +886,7 @@ class itrAcmeClient {
     fclose($tempConfigHandle);
 
     if (!$csr) {
-      $this->log('Signing request generation failed! (' . openssl_error_string() . ')', 'crtical');
+      $this->log('Signing request generation failed! (' . openssl_error_string() . ')', 'exception');
       throw new \RuntimeException('Signing request generation failed! (' . openssl_error_string() . ')');
     }
 
