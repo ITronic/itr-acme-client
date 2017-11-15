@@ -67,7 +67,7 @@ class itrAcmeClient {
   /**
    * @var string The CA Subscriber Agreement
    */
-  public $agreement = 'https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf';
+  public $agreement = 'https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf';
 
   /** Certificate Information */
 
