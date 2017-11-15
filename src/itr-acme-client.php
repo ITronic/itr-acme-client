@@ -328,7 +328,7 @@ class itrAcmeClient {
 
         $this->log('Check local access for domain: ' . $domain, 'debug');
 
-        // Ask the challengeManager to validate Domain control
+        // Ask the challengeManager to validate domain control
         try {
           if (!$this->challengeManager->validateDomainControl($domain)) {
             throw new \RuntimeException('Failed to validate control of ' . $domain, 500);
@@ -356,8 +356,8 @@ class itrAcmeClient {
       ]);
 
       if ($this->lastResponse['status'] !== 201) {
-        $this->log('Error getting available challenges for Domain ' . $domain, 'exception');
-        throw new \RuntimeException('Error getting available challenges for Domain ' . $domain, 500);
+        $this->log('Error getting available challenges for domain ' . $domain, 'exception');
+        throw new \RuntimeException('Error getting available challenges for domain ' . $domain, 500);
       }
 
       // Decode json body from request
@@ -372,11 +372,11 @@ class itrAcmeClient {
         }
       }
       if (!$challenge) {
-        $this->log('Error cannot find compatible challange for Domain ' . $domain, 'exception');
-        throw new \RuntimeException('Error cannot find compatible challange for Domain ' . $domain, 500);
+        $this->log('Error cannot find compatible challenge for domain ' . $domain, 'exception');
+        throw new \RuntimeException('Error cannot find compatible challenge for domain ' . $domain, 500);
       }
 
-      $this->log('Found challenge for Domain ' . $domain, 'info');
+      $this->log('Found challenge for domain ' . $domain, 'info');
 
       // We need last location for later validation
       preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
@@ -653,8 +653,8 @@ class itrAcmeClient {
     ];
 
     // Start openssl process to generate Diffie-Hellman Parameters
-    $this->log('Start generate Diffie-Hellman Parameters', 'info');
-    $process = proc_open('openssl dhparam -2 ' . (int)$bits, $descriptorspec, $pipes);
+    $this->log('Generating DH parameters, ' . (int)$bits . ' bit long safe prime, generator 2, This is going to take a long time', 'notice');
+    $process = proc_open('openssl dhparam -2 ' . (int)$bits . ' 2> /dev/null', $descriptorspec, $pipes);
 
     // If process started successfully we get resource, we close input pipe and load the content of the output pipe
     if (is_resource($process)) {
@@ -674,7 +674,7 @@ class itrAcmeClient {
       throw new \RuntimeException('Failed to generate Diffie-Hellman Parameters', 500);
     }
 
-    $this->log('Diffie-Hellman Parameters generation finished.', 'info');
+    $this->log('Diffie-Hellman Parameters generation finished.', 'notice');
 
     // Write Parameters to file, ignore if location is not writeable
     @file_put_contents($dhParamFile, $pem);
@@ -840,8 +840,8 @@ class itrAcmeClient {
   /**
    * Generate a certificate signing request
    *
-   * @param string $privateKey The Private key we want to sign
-   * @param array $domains The Domains we want to sign
+   * @param string $privateKey The private key we want to sign
+   * @param array $domains The domains we want to sign
    * @return string the CSR
    */
   private function generateCsr(string $privateKey, array $domains): string {
@@ -901,7 +901,7 @@ class itrAcmeClient {
   /**
    * Create the absolute path to the acme-challenge path
    *
-   * @param string $domain The Domainname we need the path for
+   * @param string $domain The domainname we need the path for
    * @return string The absolute path to the acme-challenge directory
    */
   public function getDomainWellKnownPath(string $domain): string {
@@ -1108,11 +1108,11 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
         $result                = RestHelper::get($challengeResponseUrl);
         RestHelper::$verifySsl = true;
       } catch (Throwable $exception) {
-        throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl . ' - ' . (string)$exception, 500);
+        throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl . ' - ' . (string)$exception, 500);
       }
 
       if ($result['body'] != $challengeBody) {
-        throw new \RuntimeException('Cannot verify challange reposonse at: ' . $challengeResponseUrl, 500);
+        throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl, 500);
       }
 
       $this->itrAcmeClient->log('Token is available at ' . $challengeResponseUrl, 'info');
