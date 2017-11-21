@@ -1203,9 +1203,6 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    */
   public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails): string {
 
-    // get the well-known path, we know that it already exists and we can write to it
-    $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
-
     // Create a fingerprint in the correct order
     $fingerprint = [
       'e'   => RestHelper::base64url_encode($accountKeyDetails['rsa']['e']),
@@ -1219,14 +1216,10 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     // compile challenge token and base64 encoded hash togather
     $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
-    // Save the token with the fingerpint in the well-known path and set file permissions
-    if (file_put_contents($domainWellKnownPath . '/' . $challenge['token'], $challengeBody) === false) {
-      throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
-    }
-
-    // Set webserver compatible permissions
-    if (chmod($domainWellKnownPath . '/' . $challenge['token'], $this->itrAcmeClient->webServerFilePerm) === false) {
-      throw new \RuntimeException('Failed to set permissions: ' . $domainWellKnownPath . '/' . $challenge['token'], 500);
+    // Do the actual challenge deployment
+    if (!$this->deployChallenge($domain, $challengeBody, $challenge['token'])) {
+      $this->itrAcmeClient->log('Failed to deploy challenge for domain ' . $domain, 'exception');
+      throw new \RuntimeException('Failed to deploy challenge for domain ' . $domain, 500);
     }
 
     // Validate that challenge repsonse is reachable
@@ -1252,7 +1245,33 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     }
 
     return $challengeBody;
+  }
 
+  /**
+   * Does the actual deployment
+   *
+   * @param string $fqdn      The domainname
+   * @param string $challenge The challenge needed for http-01
+   * @param string $token     The token needed for dns-01
+   *
+   * @return bool Return true on success, false on error
+   */
+  public function deployChallenge(string $fqdn, string $challenge, string $token): bool {
+
+    // get the well-known path, we know that it already exists and we can write to it
+    $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($fqdn);
+
+    // Save the token with the fingerpint in the well-known path and set file permissions
+    if (file_put_contents($domainWellKnownPath . '/' . $token, $challenge) === false) {
+      throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $token, 500);
+    }
+
+    // Set webserver compatible permissions
+    if (chmod($domainWellKnownPath . '/' . $token, $this->itrAcmeClient->webServerFilePerm) === false) {
+      throw new \RuntimeException('Failed to set permissions: ' . $domainWellKnownPath . '/' . $token, 500);
+    }
+
+    return true;
   }
 
   /**
