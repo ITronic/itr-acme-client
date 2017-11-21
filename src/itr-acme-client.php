@@ -2,10 +2,10 @@
 /**
  * ITronic ACME Client
  *
- * @package itr-acme-client
- * @link http://itronic.at
+ * @package   itr-acme-client
+ * @link      http://itronic.at
  * @copyright Copyright (C) 2017 ITronic Harald Leithner.
- * @license GNU General Public License v3
+ * @license   GNU General Public License v3
  *
  * This file is part of itr-acme-client.
  *
@@ -54,22 +54,22 @@ class itrAcmeClient {
    */
   public $caTesting = 'https://acme-staging.api.letsencrypt.org';
 
-	/**
-	 * @var string The url to the directory relative to the $ca
-	 */
-	public $directoryUrl = '/directory';
+  /**
+   * @var string The url to the directory relative to the $ca
+   */
+  public $directoryUrl = '/directory';
 
-	/**
-	 * @var array The directory of the ACME implementation
-	 */
-	public $directory = [
-		'new-authz' => '',
-		'new-cert' => '',
-		'new-reg' => '',
-		'meta' => [
-			'terms-of-service' => ''
-		]
-	];
+  /**
+   * @var array The directory of the ACME implementation
+   */
+  public $directory = [
+    'new-authz' => '',
+    'new-cert'  => '',
+    'new-reg'   => '',
+    'meta'      => [
+      'terms-of-service' => ''
+    ]
+  ];
 
   /**
    * @var bool Disable builtin valiation if we control domains
@@ -254,20 +254,20 @@ class itrAcmeClient {
       $this->challengeManager->itrAcmeClient = $this;
     }
 
-		// Request the directory
-		$this->lastResponse = RestHelper::get($this->ca . $this->directoryUrl);
-		$this->directory = json_decode($this->lastResponse['body'], true);
+    // Request the directory
+    $this->lastResponse = RestHelper::get($this->ca . $this->directoryUrl);
+    $this->directory    = json_decode($this->lastResponse['body'], true);
 
-		// Validate directory
-		if (!is_array($this->directory) ||
-			!array_key_exists('new-authz', $this->directory) ||
-			!array_key_exists('new-cert', $this->directory) ||
-			!array_key_exists('new-reg', $this->directory)
-		) {
+    // Validate directory
+    if (!is_array($this->directory) ||
+      !array_key_exists('new-authz', $this->directory) ||
+      !array_key_exists('new-cert', $this->directory) ||
+      !array_key_exists('new-reg', $this->directory)
+    ) {
 
-			$this->log('Directory information are incomplete!', 'exception');
-			throw new \RuntimeException('Directory information are incomplete!', 400);
-		}
+      $this->log('Directory information are incomplete!', 'exception');
+      throw new \RuntimeException('Directory information are incomplete!', 400);
+    }
 
     $this->log('Initialisation done.', 'debug');
 
@@ -288,6 +288,7 @@ class itrAcmeClient {
 
     if (is_file($this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key')) {
       $this->log('Account already exists', 'info');
+
       return true;
     }
 
@@ -300,16 +301,16 @@ class itrAcmeClient {
     ];
 
     // Add Subscriber Agreement
-		if (!empty($this->directory['meta']['terms-of-service'])) {
-			$payload['agreement'] = $this->directory['meta']['terms-of-service'];
+    if (!empty($this->directory['meta']['terms-of-service'])) {
+      $payload['agreement'] = $this->directory['meta']['terms-of-service'];
     }
 
     // Add contact information if exists
     if (!empty($this->contact)) {
-      $payload['contact'] = (array)$this->contact;
+      $payload['contact'] = (array) $this->contact;
     }
 
-		$this->signedRequest($this->directory['new-reg'], $payload);
+    $this->signedRequest($this->directory['new-reg'], $payload);
 
     if ($this->lastResponse['status'] !== 201) {
       $this->log('Account registration failed: ' . $this->lastResponse['status'], 'exception');
@@ -325,6 +326,7 @@ class itrAcmeClient {
    * Create a public private keypair for all given domains and sign it
    *
    * @param array $domains A list of domainnames
+   *
    * @return array Returns the certificate
    */
   public function signDomains(array $domains): array {
@@ -372,7 +374,7 @@ class itrAcmeClient {
       $this->log('Requesting challenges for domain ' . $domain, 'info');
 
       // Get available challenge methods for domain
-			$this->signedRequest($this->directory['new-authz'], [
+      $this->signedRequest($this->directory['new-authz'], [
         'resource'   => 'new-authz',
         'identifier' => [
           'type'  => 'dns',
@@ -472,7 +474,7 @@ class itrAcmeClient {
       $csr64 = trim(resthelper::base64url_encode(base64_decode($matches[1])));
 
       // request certificates creation
-			$this->signedRequest($this->directory['new-cert'], [
+      $this->signedRequest($this->directory['new-cert'], [
         'resource' => 'new-cert',
         'csr'      => $csr64
       ]);
@@ -557,7 +559,7 @@ class itrAcmeClient {
       }
 
       foreach ($domains as $domain) {
-	      $this->log('Successfuly created ' . $keyType . ' certificate for domain: ' . $domain, 'notice');
+        $this->log('Successfuly created ' . $keyType . ' certificate for domain: ' . $domain, 'notice');
       }
 
       $pem[$keyType] = [
@@ -588,7 +590,8 @@ class itrAcmeClient {
    * Generate a new public private key pair and save it to the given directory
    *
    * @param string|bool $outputDir The directory for saveing the keys
-   * @param string $keyType The Key type we want to generate
+   * @param string      $keyType   The Key type we want to generate
+   *
    * @return string Private key
    */
   protected function generateKey($outputDir = false, $keyType = 'RSA'): string {
@@ -638,6 +641,7 @@ class itrAcmeClient {
     }
 
     $this->log('Key generation finished.', 'info');
+
     return $privateKey;
   }
 
@@ -645,6 +649,7 @@ class itrAcmeClient {
    * Generate Diffie-Hellman Parameters
    *
    * @param int $bits The length in bits
+   *
    * @return string The Diffie-Hellman Parameters as pem
    */
   public function getDhParameters(int $bits = 2048): string {
@@ -658,6 +663,7 @@ class itrAcmeClient {
     // If file already exists, return its content
     if (file_exists($dhParamFile)) {
       $this->log('Diffie-Hellman Parameters already exists.', 'info');
+
       return file_get_contents($dhParamFile);
     }
 
@@ -678,8 +684,8 @@ class itrAcmeClient {
     ];
 
     // Start openssl process to generate Diffie-Hellman Parameters
-    $this->log('Generating DH parameters, ' . (int)$bits . ' bit long safe prime, generator 2, This is going to take a long time', 'notice');
-    $process = proc_open('openssl dhparam -2 ' . (int)$bits . ' 2> /dev/null', $descriptorspec, $pipes);
+    $this->log('Generating DH parameters, ' . (int) $bits . ' bit long safe prime, generator 2, This is going to take a long time', 'notice');
+    $process = proc_open('openssl dhparam -2 ' . (int) $bits . ' 2> /dev/null', $descriptorspec, $pipes);
 
     // If process started successfully we get resource, we close input pipe and load the content of the output pipe
     if (is_resource($process)) {
@@ -711,6 +717,7 @@ class itrAcmeClient {
    * Generate Elliptic Curve Parameters
    *
    * @param string $curve The name of the curve
+   *
    * @return string The Diffie-Hellman Parameters as pem
    */
   public function getEcParameters(string $curve = 'prime256v1'): string {
@@ -724,6 +731,7 @@ class itrAcmeClient {
     // If file already exists, return its content
     if (file_exists($ecParamFile)) {
       $this->log('Elliptic Curve Parameters already exists.', 'info');
+
       return file_get_contents($ecParamFile);
     }
 
@@ -760,10 +768,10 @@ class itrAcmeClient {
     }
 
     // On error fail
-	  if ($ret > 0) {
-		  $this->log('Failed to generate Elliptic Curve Parameters', 'exception');
-		  throw new \RuntimeException('Failed to generate Elliptic Curve Parameters', 500);
-	  }
+    if ($ret > 0) {
+      $this->log('Failed to generate Elliptic Curve Parameters', 'exception');
+      throw new \RuntimeException('Failed to generate Elliptic Curve Parameters', 500);
+    }
 
     $this->log('Elliptic Curve Parameters generation finished.', 'info');
 
@@ -776,8 +784,9 @@ class itrAcmeClient {
   /**
    * Sends the payload signed with the account private key to the API endpoint
    *
-   * @param string $uri Relativ uri to post the request to
-   * @param array $payload The payload to send
+   * @param string $uri     Relativ uri to post the request to
+   * @param array  $payload The payload to send
+   *
    * @return void
    */
   public function signedRequest(string $uri, array $payload): void {
@@ -866,7 +875,8 @@ class itrAcmeClient {
    * Generate a certificate signing request
    *
    * @param string $privateKey The private key we want to sign
-   * @param array $domains The domains we want to sign
+   * @param array  $domains    The domains we want to sign
+   *
    * @return string the CSR
    */
   private function generateCsr(string $privateKey, array $domains): string {
@@ -927,6 +937,7 @@ class itrAcmeClient {
    * Create the absolute path to the acme-challenge path
    *
    * @param string $domain The domainname we need the path for
+   *
    * @return string The absolute path to the acme-challenge directory
    */
   public function getDomainWellKnownPath(string $domain): string {
@@ -949,6 +960,7 @@ class itrAcmeClient {
    * Adds testing prefix if we are in testing mode and keytype
    *
    * @param string $keyType The key Type
+   *
    * @return string Return text Prefixes
    */
   protected function getKeyPrefix(string $keyType): string {
@@ -968,7 +980,8 @@ class itrAcmeClient {
    * Logging function, use \Psr\Log\LoggerInterface if set
    *
    * @param string $message The log message
-   * @param string $level The log level used for Pse logging
+   * @param string $level   The log level used for Pse logging
+   *
    * @return void
    */
   public function log(string $message, string $level = 'info'): void {
@@ -989,6 +1002,7 @@ interface itrAcmeChallengeManager {
    * This function validates if we control the domain so we can complete the challenge
    *
    * @param string $domain
+   *
    * @return mixed
    */
   public function validateDomainControl(string $domain);
@@ -997,8 +1011,9 @@ interface itrAcmeChallengeManager {
    * Prepare the challenge for $domain
    *
    * @param string $domain
-   * @param array $challenge
-   * @param array $accountKeyDetails
+   * @param array  $challenge
+   * @param array  $accountKeyDetails
+   *
    * @return mixed
    */
   public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails);
@@ -1035,6 +1050,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    * This function validates if we control the domain so we can complete the challenge
    *
    * @param string $domain
+   *
    * @return bool
    */
   public function validateDomainControl(string $domain): bool {
@@ -1072,7 +1088,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
       $response              = RestHelper::get('http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt');
       RestHelper::$verifySsl = true;
     } catch (Throwable $exception) {
-      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt - ' . (string)$exception, 500);
+      throw new \RuntimeException('Failed to validate content of local check file at http://' . $domain . '/.well-known/acme-challenge/' . $verify_hash . '.txt - ' . (string) $exception, 500);
     } // We always want a clean directory
     finally {
       unlink($domainWellKnownPath);
@@ -1090,8 +1106,9 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    * Save the challenge token to the well-known path
    *
    * @param string $domain
-   * @param array $challenge
-   * @param array $accountKeyDetails
+   * @param array  $challenge
+   * @param array  $accountKeyDetails
+   *
    * @return string
    */
   public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails): string {
@@ -1132,7 +1149,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
         $result                = RestHelper::get($challengeResponseUrl);
         RestHelper::$verifySsl = true;
       } catch (Throwable $exception) {
-        throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl . ' - ' . (string)$exception, 500);
+        throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl . ' - ' . (string) $exception, 500);
       }
 
       if ($result['body'] != $challengeBody) {
@@ -1152,7 +1169,8 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
    * Remove challenge response file
    *
    * @param string $domain
-   * @param array $challenge
+   * @param array  $challenge
+   *
    * @return void
    */
   public function cleanupChallenge(string $domain, array $challenge): void {
@@ -1180,9 +1198,10 @@ class RestHelper {
   /**
    * Call the url as GET
    *
-   * @param string $url The url
-   * @param array $obj The parameters
+   * @param string $url    The url
+   * @param array  $obj    The parameters
    * @param string $return The Format of the result
+   *
    * @return array|string  The result
    */
   public static function get(string $url, array $obj = [], string $return = 'print') {
@@ -1199,9 +1218,10 @@ class RestHelper {
   /**
    * Call the url as POST
    *
-   * @param string $url The url
-   * @param array|string $obj The parameters
-   * @param string $return The Format of the result
+   * @param string       $url    The url
+   * @param array|string $obj    The parameters
+   * @param string       $return The Format of the result
+   *
    * @return array|string  The result
    */
   public static function post(string $url, $obj = [], string $return = 'print') {
@@ -1217,8 +1237,8 @@ class RestHelper {
   /**
    * Call the url as PUT
    *
-   * @param string $url The url
-   * @param array $obj The parameters
+   * @param string $url    The url
+   * @param array  $obj    The parameters
    * @param string $return The Format of the result
    *
    * @return array|string  The result
@@ -1236,8 +1256,8 @@ class RestHelper {
   /**
    * Call the url as PUT
    *
-   * @param string $url The url
-   * @param array $obj The parameters
+   * @param string $url    The url
+   * @param array  $obj    The parameters
    * @param string $return The Format of the result
    *
    * @return array|string  The result
@@ -1256,6 +1276,7 @@ class RestHelper {
    * Create a cUrl object
    *
    * @param string $url The url
+   *
    * @return resource   The curl resource
    */
   public static function loadCurl(string $url) {
@@ -1327,6 +1348,7 @@ class RestHelper {
    * Encode $data to base64 url safe
    *
    * @param string $data The input string
+   *
    * @return string The base64 url safe string
    */
   public static function base64url_encode(string $data): string {
@@ -1337,6 +1359,7 @@ class RestHelper {
    * Decodes $data as base64 url safe string
    *
    * @param string $data The base64 url safe string
+   *
    * @return string The decoded string
    */
   public static function base64url_decode(string $data): string {
