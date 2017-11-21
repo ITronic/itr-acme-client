@@ -77,7 +77,7 @@ class itrAcmeClient {
   public $disableValidation = false;
 
   /**
-   * @var string|itrAcmeChallengeManagerHttp The challenge Manager class or an itrAcmeChallengeManagerHttp object
+   * @var string|itrAcmeChallengeManager The challenge Manager class or an itrAcmeChallengeManager object
    */
   public $challengeManager = 'itrAcmeChallengeManagerHttp';
 
@@ -438,8 +438,8 @@ class itrAcmeClient {
       // Check if we finished the challenge successfuly, if not cleanup and throw an exception
       if ($this->lastResponse['json']['status'] !== 'valid') {
         $this->challengeManager->cleanupChallenge($domain, $challenge);
-        $this->log('Verification Status: ' . $this->lastResponse['json']['status'] . ' Repsonse: ' . $this->lastResponse['body'], 'exception');
-        throw new \RuntimeException('Verification Status: ' . $this->lastResponse['json']['status'] . ' Repsonse: ' . $this->lastResponse['body'], 500);
+        $this->log('Verification Status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 'exception');
+        throw new \RuntimeException('Verification Status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 500);
       }
 
       $this->log('Verification status: ' . $this->lastResponse['json']['status'], 'info');
@@ -1003,7 +1003,7 @@ interface itrAcmeChallengeManager {
    *
    * @param string $domain
    *
-   * @return mixed
+   * @return bool
    */
   public function validateDomainControl(string $domain);
 
@@ -1014,7 +1014,7 @@ interface itrAcmeChallengeManager {
    * @param array  $challenge
    * @param array  $accountKeyDetails
    *
-   * @return mixed
+   * @return string The challenge body
    */
   public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails);
 
