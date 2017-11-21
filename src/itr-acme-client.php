@@ -429,7 +429,7 @@ class itrAcmeClient {
 
         if ($this->lastResponse['json']['status'] === 'pending') {
           $this->log('Verification is still pending...', 'info');
-          usleep(1500);
+          usleep(1500000);
         } else {
           break;
         }
@@ -499,7 +499,7 @@ class itrAcmeClient {
         if ($this->lastResponse['status'] === 202) {
 
           $this->log('Certificate generation is still pending...', 'info');
-          usleep(1500);
+          usleep(1500000);
 
         } elseif ($this->lastResponse['status'] === 200) {
 
