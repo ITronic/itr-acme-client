@@ -190,6 +190,21 @@ class itrAcmeClient {
   public $appendWellKnownPath = true;
 
   /**
+   * @var array All Authoritative DNS server for the DNS-01 challenge, if empty we try to find it
+   */
+  public $dnsAuthServers = [];
+
+  /**
+   * @var int Seconds / 2 to wait for population of challenge on all nameservers, default 10 minutes
+   */
+  public $dnsTimeout = 300;
+
+  /**
+   * @var string The path to dig binary
+   */
+  public $execDig = '/usr/bin/dig';
+
+  /**
    * @var \Psr\Log\LoggerInterface|null The logger to use, loglevel is always info
    */
   public $logger = null;
@@ -1005,7 +1020,7 @@ interface itrAcmeChallengeManager {
    *
    * @return bool
    */
-  public function validateDomainControl(string $domain);
+  public function validateDomainControl(string $domain): bool;
 
   /**
    * Prepare the challenge for $domain
@@ -1016,7 +1031,27 @@ interface itrAcmeChallengeManager {
    *
    * @return string The challenge body
    */
-  public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails);
+  public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails): string;
+
+  /**
+   * Does the actual deployment
+   *
+   * @param string $fqdn      The domainname
+   * @param string $challenge The challenge needed for http-01
+   * @param string $token     The token needed for dns-01
+   *
+   * @return bool Return true on success, false on error
+   */
+  public function deployChallenge(string $fqdn, string $challenge, string $token): bool;
+
+  /**
+   * Tries to find the authoritative nameservers and seperates the fqdn in to subdomain and domain
+   *
+   * @param string $fqdn The fully qualified domain name
+   *
+   * @return array Index array with 'dnsServer' array DNS Server array, 'domain' string The domain, 'subDomain' string The subdomain
+   */
+  public function getDnsInformation(string $fqdn): array;
 
 }
 
@@ -1033,6 +1068,61 @@ abstract class itrAcmeChallengeManagerClass implements itrAcmeChallengeManager {
    * @var string The challenge type
    */
   public $type = '';
+
+  /**
+   * Tries to find the authoritative nameservers and seperates the fqdn in to subdomain and domain
+   *
+   * @param string $fqdn The fully qualified domain name
+   *
+   * @return array Index array with 'dnsServer' array DNS Server array, 'domain' string The domain, 'subDomain' string The subdomain
+   */
+  public function getDnsInformation(string $fqdn): array {
+
+    static $cache = [];
+
+    if (!isset($cache[$fqdn])) {
+      $output = [];
+      $result = [
+        'dnsServer' => [],
+        'domain'    => '',
+        'subDomain' => ''
+      ];
+
+      exec($this->itrAcmeClient->execDig . '  +noall +authority +comments +nottlid ANY ' . $fqdn, $output);
+
+      // Find nameserver and check if domain exists
+      foreach ($output as $k => $v) {
+        $v = trim($v);
+
+        // Check for header section
+        if (strpos($v, '->>HEADER<<-') !== false) {
+          // Raise an exception if subomain is not found
+          if (strpos($v, 'NXDOMAIN') !== false) {
+            $this->itrAcmeClient->log('No dns entry found for domain ' . $fqdn, 'exception');
+            throw new \RuntimeException('No dns entry found for domain ' . $fqdn, 500);
+          }
+        }
+
+        // Remove comments and blank lines
+        if (empty($v) || substr($v, 0, 1) == ';') {
+          continue;
+        }
+
+        $line = explode("\t", $v);
+
+        $result['domain']       = rtrim(array_shift($line), '.');
+        $result['dnsServers'][] = array_pop($line);
+      }
+
+      if ($fqdn !== $result['domain']) {
+        $result['subDomain'] = rtrim(str_replace($result['domain'], '', $fqdn), '.');
+      }
+
+      $cache[$fqdn] = $result;
+    }
+
+    return $cache[$fqdn];
+  }
 }
 
 /**
@@ -1178,6 +1268,161 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
 
     unlink($domainWellKnownPath . '/' . $challenge['token']);
+  }
+}
+
+/**
+ * class itrAcmeChallengeManagerDns
+ */
+class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
+
+  /**
+   * @var string The challenge type http
+   * @return bool
+   */
+  public $type = 'dns-01';
+
+  /**
+   * This function validates if we control the domain so we can complete the challenge
+   *
+   * @param string $domain
+   *
+   * @return bool
+   */
+  public function validateDomainControl(string $domain): bool {
+
+    // We don't validated the control of the domain if we use the dns-01 challenge
+
+    return true;
+  }
+
+  /**
+   * Save the challenge token to the well-known path
+   *
+   * @param string $domain
+   * @param array  $challenge
+   * @param array  $accountKeyDetails
+   *
+   * @return string
+   */
+  public function prepareChallenge(string $domain, array $challenge, array $accountKeyDetails): string {
+
+    // get the well-known path, we know that it already exists and we can write to it
+    $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($domain);
+
+    // Create a fingerprint in the correct order
+    $fingerprint = [
+      'e'   => RestHelper::base64url_encode($accountKeyDetails['rsa']['e']),
+      'kty' => 'RSA',
+      'n'   => RestHelper::base64url_encode($accountKeyDetails['rsa']['n'])
+    ];
+
+    // We need a sha256 hash
+    $hash = hash('sha256', json_encode($fingerprint), true);
+
+    // compile challenge token and base64 encoded hash togather
+    $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
+
+    // We need a hashed hash
+    $hash = hash('sha256', $challengeBody, true);
+
+    $dnsBody = RestHelper::base64url_encode($hash);
+
+    // Load nameserver set in itrAcmeClient or try to find it per dns
+    if (count($this->itrAcmeClient->dnsAuthServers) > 0) {
+      $dnsServers = $this->itrAcmeClient->dnsAuthServers;
+    } else {
+      $dnsServers = $this->getDnsInformation($domain)['dnsServers'];
+    }
+
+    // If no authoritative dns server is found we raise an exception
+    if (count($dnsServers) == 0) {
+      $this->itrAcmeClient->log('Failed to get authoritative nameserver for domain ' . $domain, 'exception');
+      throw new \RuntimeException('Failed to get authoritative nameserver for domain ' . $domain, 500);
+    }
+
+    // Do the actual challenge deployment
+    if (!$this->deployChallenge($domain, $dnsBody, $challenge['token'])) {
+      $this->itrAcmeClient->log('Failed to deploy challenge for domain ' . $domain, 'exception');
+      throw new \RuntimeException('Failed to deploy challenge for domain ' . $domain, 500);
+    }
+
+    // Start openssl process to generate Elliptic Curve Parameters
+    $this->itrAcmeClient->log('Start checking nameservers for challenge', 'info');
+    for ($i = 0; $i <= $this->itrAcmeClient->dnsTimeout; $i++) {
+
+      foreach ($dnsServers as $k => $dnsServer) {
+        // Start openssl process to generate Elliptic Curve Parameters
+        $this->itrAcmeClient->log('Getting TXT record from ' . $dnsServer . ' for domain ' . $domain, 'info');
+        exec($this->itrAcmeClient->execDig . ' @' . $dnsServer . ' +short TXT _acme-challenge.' . $domain, $output);
+
+        // Check all entries for the challenge and unset if we found it
+        foreach ($output as $line) {
+          if (trim($line) === '"' . $dnsBody . '"') {
+            unset($dnsServers[$k]);
+            $this->itrAcmeClient->log('Found challenge on ' . $dnsServer . ' for domain ' . $domain, 'info');
+            break;
+          }
+        }
+      }
+
+      // All servers have the correct challenge
+      if (empty($dnsServers)) {
+        break;
+      }
+
+      usleep(1500000);
+    }
+
+    if (!empty($dnsServers)) {
+      $this->itrAcmeClient->log('Failed to get challenge from nameserver(s) ' . implode(',', $dnsServers) . ' for domain ' . $domain, 'exception');
+      throw new \RuntimeException('Failed to get challenge from nameserver(s) ' . implode(',', $dnsServers) . ' for domain ' . $domain, 500);
+    }
+
+    return $challengeBody;
+  }
+
+  /**
+   * Does the actual deployment
+   *
+   * @param string $fqdn      The domainname
+   * @param string $challenge The challenge needed for http-01
+   * @param string $token     The token needed for http-01, dns-01
+   *
+   * @return bool Return true on success, false on error
+   */
+  public function deployChallenge(string $fqdn, string $challenge, string $token): bool {
+
+    $ret       = 0;
+    $output    = [];
+    $info      = $this->getDnsInformation($fqdn);
+    $domain    = $info['domain'];
+    $subDomain = $info['subDomain'];
+
+    // We are compatible to the hook script of dehydrated https://github.com/lukas2511/dehydrated
+    exec('dns-helper deploy_challenge ' . $subDomain . '.' . $domain . ' ' . $token . ' ' . $challenge, $output, $ret);
+
+    return $ret > 0 ? false : true;
+  }
+
+  /**
+   * Remove challenge response file
+   *
+   * @param string $domain
+   * @param array  $challenge
+   *
+   * @return void
+   */
+  public function cleanupChallenge(string $domain, array $challenge): void {
+
+    $ret       = 0;
+    $output    = [];
+    $info      = $this->getDnsInformation($fqdn);
+    $domain    = $info['domain'];
+    $subDomain = $info['subDomain'];
+
+    // We are compatible to the hook script of dehydrated https://github.com/lukas2511/dehydrated
+    exec('dns-helper deploy_challenge ' . $subDomain . '.' . $domain . ' ' . $challenge['token'], $output, $ret);
   }
 }
 
