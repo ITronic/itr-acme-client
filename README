@@ -10,6 +10,13 @@ Requirements
 * Openssl 1.0+
 * Curl
 
+Requirements for dns-01
+---------------------
+
+* Dig
+* Programm execution allowed
+
+
 Usage
 ---------------------
 
@@ -127,11 +134,19 @@ MII...
 
 The simpleSaveToDir.php examples saves the certificates to File.
 
+Extend
+---------------------
+
+If you like to use your own deployment function for challenges you can
+extend the class itrAcmeChallengeManagerClass or one of it's children.
+
+You find a example in examples/customDnsChallengeDeploy.php
+
 Limitations
 ---------------------
 
 * No revocation function
-* Only http-01 challenge support
+* Only dns-01 and http-01 challenge support
 
 Links
 ---------------------
