@@ -61,11 +61,6 @@ try {
   // Sign the Domains and get the certificates
   $pem = $iac->signDomains($domains);
 
-  // Save certificates for example in the certDir
-  file_put_contents($iac->certDir . '/cert.crt', $pem['RSA']['cert']);
-  file_put_contents($iac->certDir . '/chain.pem', $pem['RSA']['chain']);
-  file_put_contents($iac->certDir . '/cert.pem', $pem['RSA']['pem']);
-
   // Output the certificate informatione
   print_r($pem);
 
