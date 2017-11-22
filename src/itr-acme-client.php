@@ -1036,13 +1036,13 @@ interface itrAcmeChallengeManager {
   /**
    * Does the actual deployment
    *
-   * @param string $fqdn      The domainname
-   * @param string $challenge The challenge needed for http-01
-   * @param string $token     The token needed for dns-01
+   * @param string $fqdn        The domainname
+   * @param string $signedToken The challenge needed for http-01
+   * @param string $token       The token needed for dns-01
    *
    * @return bool Return true on success, false on error
    */
-  public function deployChallenge(string $fqdn, string $challenge, string $token): bool;
+  public function deployChallenge(string $fqdn, string $signedToken, string $token): bool;
 
   /**
    * Tries to find the authoritative nameservers and seperates the fqdn in to subdomain and domain
@@ -1214,10 +1214,10 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
     $hash = hash('sha256', json_encode($fingerprint), true);
 
     // compile challenge token and base64 encoded hash togather
-    $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
+    $signedToken = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
     // Do the actual challenge deployment
-    if (!$this->deployChallenge($domain, $challengeBody, $challenge['token'])) {
+    if (!$this->deployChallenge($domain, $signedToken, $challenge['token'])) {
       $this->itrAcmeClient->log('Failed to deploy challenge for domain ' . $domain, 'exception');
       throw new \RuntimeException('Failed to deploy challenge for domain ' . $domain, 500);
     }
@@ -1235,7 +1235,7 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
         throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl . ' - ' . (string) $exception, 500);
       }
 
-      if ($result['body'] != $challengeBody) {
+      if ($result['body'] != $signedToken) {
         throw new \RuntimeException('Cannot verify challenge reposonse at: ' . $challengeResponseUrl, 500);
       }
 
@@ -1244,25 +1244,25 @@ class itrAcmeChallengeManagerHttp extends itrAcmeChallengeManagerClass {
       $this->itrAcmeClient->log('Token should be available at ' . $challengeResponseUrl, 'info');
     }
 
-    return $challengeBody;
+    return $signedToken;
   }
 
   /**
    * Does the actual deployment
    *
-   * @param string $fqdn      The domainname
-   * @param string $challenge The challenge needed for http-01
-   * @param string $token     The token needed for dns-01
+   * @param string $fqdn        The domainname
+   * @param string $signedToken The challenge needed for http-01
+   * @param string $token       The token needed for dns-01
    *
    * @return bool Return true on success, false on error
    */
-  public function deployChallenge(string $fqdn, string $challenge, string $token): bool {
+  public function deployChallenge(string $fqdn, string $signedToken, string $token): bool {
 
     // get the well-known path, we know that it already exists and we can write to it
     $domainWellKnownPath = $this->itrAcmeClient->getDomainWellKnownPath($fqdn);
 
     // Save the token with the fingerpint in the well-known path and set file permissions
-    if (file_put_contents($domainWellKnownPath . '/' . $token, $challenge) === false) {
+    if (file_put_contents($domainWellKnownPath . '/' . $token, $signedToken) === false) {
       throw new \RuntimeException('Failed to write: ' . $domainWellKnownPath . '/' . $token, 500);
     }
 
@@ -1342,10 +1342,8 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
     // compile challenge token and base64 encoded hash togather
     $challengeBody = $challenge['token'] . '.' . RestHelper::base64url_encode($hash);
 
-    // We need a hashed hash
-    $hash = hash('sha256', $challengeBody, true);
-
-    $dnsBody = RestHelper::base64url_encode($hash);
+    // We need a hashed signedToken
+    $signedToken = RestHelper::base64url_encode(hash('sha256', $challengeBody, true));
 
     // Load nameserver set in itrAcmeClient or try to find it per dns
     if (count($this->itrAcmeClient->dnsAuthServers) > 0) {
@@ -1361,7 +1359,7 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
     }
 
     // Do the actual challenge deployment
-    if (!$this->deployChallenge($domain, $dnsBody, $challenge['token'])) {
+    if (!$this->deployChallenge($domain, $signedToken, $challenge['token'])) {
       $this->itrAcmeClient->log('Failed to deploy challenge for domain ' . $domain, 'exception');
       throw new \RuntimeException('Failed to deploy challenge for domain ' . $domain, 500);
     }
@@ -1377,7 +1375,7 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
 
         // Check all entries for the challenge and unset if we found it
         foreach ($output as $line) {
-          if (trim($line) === '"' . $dnsBody . '"') {
+          if (trim($line) === '"' . $signedToken . '"') {
             unset($dnsServers[$k]);
             $this->itrAcmeClient->log('Found challenge on ' . $dnsServer . ' for domain ' . $domain, 'info');
             break;
@@ -1404,13 +1402,13 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
   /**
    * Does the actual deployment
    *
-   * @param string $fqdn      The domainname
-   * @param string $challenge The challenge needed for http-01
-   * @param string $token     The token needed for http-01, dns-01
+   * @param string $fqdn        The domainname
+   * @param string $signedToken The challenge needed for http-01, dns-01
+   * @param string $token       The token needed for http-01
    *
    * @return bool Return true on success, false on error
    */
-  public function deployChallenge(string $fqdn, string $challenge, string $token): bool {
+  public function deployChallenge(string $fqdn, string $signedToken, string $token): bool {
 
     $ret       = 0;
     $output    = [];
@@ -1419,7 +1417,7 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
     $subDomain = $info['subDomain'];
 
     // We are compatible to the hook script of dehydrated https://github.com/lukas2511/dehydrated
-    exec('dns-helper deploy_challenge ' . $subDomain . '.' . $domain . ' ' . $token . ' ' . $challenge, $output, $ret);
+    exec('dns-helper deploy_challenge ' . $subDomain . '.' . $domain . ' ' . $token . ' ' . $signedToken, $output, $ret);
 
     return $ret > 0 ? false : true;
   }
