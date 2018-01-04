@@ -6,6 +6,7 @@
  * @link      http://itronic.at
  * @copyright Copyright (C) 2017 ITronic Harald Leithner.
  * @license   GNU General Public License v3
+ * @version   1.0
  *
  * This file is part of itr-acme-client.
  *
