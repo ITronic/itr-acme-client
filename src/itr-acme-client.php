@@ -121,6 +121,11 @@ class itrAcmeClient {
   public $certAccountDir = '/etc/ssl/accounts';
 
   /**
+   * @var string The key identifier provided by the CA
+   */
+  public $certKeyId = '';
+
+  /**
    * @var int Hours to cache the certificate chain
    */
   public $certChainCache = 24;
@@ -310,6 +315,25 @@ class itrAcmeClient {
     if (is_file($this->certAccountDir . '/' . $this->getKeyPrefix($keyType) . 'private.key')) {
       $this->log('Account already exists', 'info');
 
+      // Build payload array
+      $payload = [
+        'onlyReturnExisting' => true
+      ];
+
+      $this->signedRequest($this->directory['newAccount'], $payload);
+
+      if ($this->lastResponse['status'] !== 200) {
+        $this->log('Account validation failed: ' . $this->lastResponse['status'], 'exception');
+        throw new \RuntimeException('Account validation failed: ' . $this->lastResponse['status'], 500);
+      }
+
+      if (preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches)) {
+        $this->certKeyId = trim($matches[1]);
+      } else {
+        $this->log('Could not get key identifier!', 'exception');
+        throw new \RuntimeException('Could not get Nonce!', 500);
+      }
+
       return true;
     }
 
@@ -335,6 +359,13 @@ class itrAcmeClient {
     if ($this->lastResponse['status'] !== 201) {
       $this->log('Account registration failed: ' . $this->lastResponse['status'], 'exception');
       throw new \RuntimeException('Account registration failed: ' . $this->lastResponse['status'], 500);
+    }
+
+    if (preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches)) {
+      $this->certKeyId = trim($matches[1]);
+    } else {
+      $this->log('Could not get key identifier!', 'exception');
+      throw new \RuntimeException('Could not get Nonce!', 500);
     }
 
     $this->log('Account registration completed', 'notice');
@@ -849,6 +880,11 @@ class itrAcmeClient {
       ];
     }
 
+    if(!empty($this->certKeyId)) {
+      unset($protected['jwk']);
+      $protected['kid'] = $this->certKeyId;
+    }
+
     // Get Replay-Nonce for next request
     if (empty($this->lastResponse) || strpos($this->lastResponse['header'], 'Replay-Nonce') === false) {
       $this->lastResponse = RestHelper::get($this->directory['newNonce']);
@@ -862,6 +898,11 @@ class itrAcmeClient {
     }
 
     $protected['url'] = $uri;
+
+    // Payload must be an object if it is empty
+    if (empty($payload)) {
+      $payload = new stdclass;
+    }
 
     // Encode base64 payload and protected header
     $payload64   = RestHelper::base64url_encode(str_replace('\\/', '/', json_encode($payload)));
@@ -883,7 +924,7 @@ class itrAcmeClient {
     }
 
     $this->log('Sending signed request to ' . $uri, 'info');
-var_dump([$protected,$data]);
+
     // Post Signed data to API endpoint
     $this->lastResponse = RestHelper::post($uri, json_encode($data));
   }
