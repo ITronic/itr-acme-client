@@ -419,86 +419,6 @@ class itrAcmeClient {
       $this->log('Check local successfully completed!', 'info');
     }
 
-    // Get challenge and validate each domain
-    foreach ($domains as $domain) {
-
-      $this->log('Requesting challenges for domain ' . $domain, 'info');
-
-      // Get available challenge methods for domain
-      $this->signedRequest($this->directory['new-authz'], [
-        'resource'   => 'new-authz',
-        'identifier' => [
-          'type'  => 'dns',
-          'value' => $domain
-        ]
-      ]);
-
-      if ($this->lastResponse['status'] !== 201) {
-        $this->log('Error getting available challenges for domain ' . $domain, 'exception');
-        throw new \RuntimeException('Error getting available challenges for domain ' . $domain, 500);
-      }
-
-      // Decode json body from request
-      $response = json_decode($this->lastResponse['body'], true);
-
-      // Check if our challengeManager is supported
-      $challenge = false;
-      foreach ($response['challenges'] as $k => $v) {
-        if ($this->challengeManager->type === $v['type']) {
-          $challenge = $v;
-          break;
-        }
-      }
-      if (!$challenge) {
-        $this->log('Error cannot find compatible challenge for domain ' . $domain, 'exception');
-        throw new \RuntimeException('Error cannot find compatible challenge for domain ' . $domain, 500);
-      }
-
-      $this->log('Found challenge for domain ' . $domain, 'info');
-
-      // We need last location for later validation
-      preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
-      $verificationUrl = trim($matches[1]);
-
-      // Prepare Challenge
-      $keyAuthorization = $this->challengeManager->prepareChallenge($domain, $challenge, $accountKeyDetails);
-
-      // Notify the CA that the challenge is ready
-      $this->log('Notify CA that the challenge is ready', 'info');
-
-      $this->signedRequest($challenge['uri'], [
-        'resource'         => 'challenge',
-        'type'             => $this->challengeManager->type,
-        'keyAuthorization' => $keyAuthorization,
-        'token'            => $challenge['token']
-      ]);
-
-      // Check the status of the challenge, break after 90 seconds
-      for ($i = 0; $i < 60; $i++) {
-        $this->lastResponse         = RestHelper::get($verificationUrl);
-        $this->lastResponse['json'] = json_decode($this->lastResponse['body'], true);
-
-        if ($this->lastResponse['json']['status'] === 'pending') {
-          $this->log('Verification is still pending...', 'info');
-          usleep(1500000);
-        } else {
-          break;
-        }
-      }
-
-      // Check if we finished the challenge successfuly, if not cleanup and throw an exception
-      if ($this->lastResponse['json']['status'] !== 'valid') {
-        $this->challengeManager->cleanupChallenge($domain, $challenge);
-        $this->log('Verification Status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 'exception');
-        throw new \RuntimeException('Verification Status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 500);
-      }
-
-      $this->log('Verification status: ' . $this->lastResponse['json']['status'], 'info');
-
-      // Cleanup
-      $this->challengeManager->cleanupChallenge($domain, $challenge);
-    }
-
     // Get certificate directory
     $certDir = $this->certDir;
     rtrim($certDir, '/');
@@ -515,28 +435,124 @@ class itrAcmeClient {
     // Create new public private keys for each keyType
     foreach ($this->certKeyTypes as $keyType) {
 
+      $payload = [
+        'identifiers' => [
+        ]
+      ];
+
+      // Get challenge and validate each domain
+      foreach ($domains as $domain) {
+
+        $this->log('Requesting challenges for domain ' . $domain, 'info');
+
+        $identifier        = new stdClass;
+        $identifier->type  = 'dns';
+        $identifier->value = $domain;
+
+        $payload['identifiers'][] = $identifier;
+      }
+
+      // Get available challenge methods for domain
+      $this->signedRequest($this->directory['newOrder'], $payload);
+
+      if ($this->lastResponse['status'] !== 201) {
+        $this->log('Error getting available challenges for domain ' . $domain, 'exception');
+        throw new \RuntimeException('Error getting available challenges for domain ' . $domain, 500);
+      }
+
+      // Decode json body from request
+      $response = json_decode($this->lastResponse['body'], true);
+
+      $authorizations = $response['authorizations'];
+      $finalize = $response['finalize'];
+
+      preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
+      $orderLocation = trim($matches[1]);
+
+      foreach($authorizations as $authorization) {
+
+        $this->lastResponse = RestHelper::get($authorization);
+        $authorizationData  = json_decode($this->lastResponse['body'], true);
+        $domain             = $authorizationData['identifier']['value'];
+
+        // Check if our challengeManager is supported
+        $challenge = false;
+        foreach ($authorizationData['challenges'] as $k => $v) {
+          if ($this->challengeManager->type === $v['type']) {
+            $challenge = $v;
+            break;
+          }
+        }
+        if (!$challenge) {
+          $this->log('Error cannot find compatible challenge for domain ' . $domain, 'exception');
+          throw new \RuntimeException('Error cannot find compatible challenge for domain ' . $domain, 500);
+        }
+
+        $this->log('Found challenge for domain ' . $domain, 'info');
+
+        // Prepare Challenge
+        $keyAuthorization = $this->challengeManager->prepareChallenge($domain, $challenge, $accountKeyDetails);
+
+        // Notify the CA that the challenge is ready
+        $this->log('Notify CA that the challenge is ready', 'info');
+
+        $this->signedRequest($challenge['url'], []);
+
+        // Check the status of the challenge, break after 90 seconds
+        for ($i = 0; $i < 60; $i++) {
+          $this->lastResponse         = RestHelper::get($challenge['url']);
+          $this->lastResponse['json'] = json_decode($this->lastResponse['body'], true);
+
+          if ($this->lastResponse['json']['status'] === 'pending') {
+            $this->log('Verification is still pending...', 'info');
+            usleep(1500000);
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Generate a private key for all domains
       $privateDomainKey = $this->generateKey(false, $keyType);
 
-      // Generate a cerfication signing request for all domains
+      // Generate a certfication signing request for all domains
       $csr = $this->generateCsr($privateDomainKey, $domains, $certDir);
 
       // Convert base64 to base64 url safe
       preg_match('/REQUEST-----(.*)-----END/s', $csr, $matches);
       $csr64 = trim(resthelper::base64url_encode(base64_decode($matches[1])));
 
-      // request certificates creation
-      $this->signedRequest($this->directory['new-cert'], [
-        'resource' => 'new-cert',
-        'csr'      => $csr64
-      ]);
 
-      if ($this->lastResponse['status'] !== 201) {
-        throw new \RuntimeException('Invalid response code: ' . $this->lastResponse['status'] . ', ' . json_encode($this->lastResponse));
+      $payload = [
+        'csr' => $csr64
+      ];
+
+      $this->signedRequest($finalize, $payload);
+
+      // Check the status of the certificate, break after 90 seconds
+      for ($i = 0; $i < 60; $i++) {
+        $this->lastResponse         = RestHelper::get($orderLocation);
+        $this->lastResponse['json'] = json_decode($this->lastResponse['body'], true);
+
+        if ($this->lastResponse['json']['status'] === 'pending') {
+          $this->log('Certificate is still pending...', 'info');
+          usleep(1500000);
+        } else {
+          break;
+        }
       }
 
-      // We need last location for later validation
-      preg_match('/Location: (.+)/i', $this->lastResponse['header'], $matches);
-      $certificateUrl = trim($matches[1]);
+      // Check if we finished the challenge successfuly, if not cleanup and throw an exception
+      if ($this->lastResponse['json']['status'] !== 'valid') {
+        $this->challengeManager->cleanupChallenge($domain, $challenge);
+        $this->log('Order status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 'exception');
+        throw new \RuntimeException('Order status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 500);
+      }
+
+      $this->log('Order status: ' . $this->lastResponse['json']['status'], 'info');
+
+      // Cleanup
+      $this->challengeManager->cleanupChallenge($domain, $challenge);
 
       // Init variables
       $certChain   = '';
@@ -545,7 +561,7 @@ class itrAcmeClient {
       // Check the status of the challenge, break after 90 seconds
       for ($i = 0; $i < 60; $i++) {
 
-        $this->lastResponse = RestHelper::get($certificateUrl);
+        $this->lastResponse = RestHelper::get($this->lastResponse['json']['certificate']);
 
         if ($this->lastResponse['status'] === 202) {
 
@@ -556,44 +572,11 @@ class itrAcmeClient {
 
           $this->log('Certificate generation complete.', 'info');
 
-          $cert64 = base64_encode($this->lastResponse['body']);
-          $cert64 = chunk_split($cert64, 64, chr(10));
+          $certificates = explode(chr(10).chr(10), $this->lastResponse['body']);
+          $certificate  = array_shift($certificates).chr(10);
 
-          $certificate = '-----BEGIN CERTIFICATE-----' . chr(10) . $cert64 . '-----END CERTIFICATE-----' . chr(10);
-
-          // Load certificate chain
-          preg_match_all('/Link: <(.+)>;rel="up"/', $this->lastResponse['header'], $matches);
-
-          // Build a 5 char long hash for certificate chain
-          $certChainHash      = substr(hash('sha256', implode(';', $matches[1])), 0, 6);
-          $certChainCacheFile = $this->certAccountDir . '/chain-' . $certChainHash . '.crt';
-
-          // Load certificate chain from file or from web
-          if (is_file($certChainCacheFile) && filemtime($certChainCacheFile) > time() - ($this->certChainCache * 60 * 60)) {
-            $this->log('Load chain certificate from cache: ' . $certChainCacheFile, 'info');
-            $certChain = file_get_contents($certChainCacheFile);
-          } else {
-            $this->log('Load chain certificate from web, local cache does not exists or is expired', 'info');
-
-            foreach ($matches[1] as $url) {
-              $this->log('Load chain cert from: ' . $url, 'info');
-
-              // Get certificate from webserver
-              $result = RestHelper::get($url);
-
-              // Encode certificate to base64 url safe
-              if ($result['status'] === 200) {
-                $cert64 = base64_encode($result['body']);
-                $cert64 = chunk_split($cert64, 64, chr(10));
-
-                $certChain .= '-----BEGIN CERTIFICATE-----' . chr(10);
-                $certChain .= $cert64;
-                $certChain .= '-----END CERTIFICATE-----' . chr(10);
-              }
-            }
-
-            // Save certificate chain to cache file
-            @file_put_contents($certChainCacheFile, $certChain);
+          if (count($certificates) > 0) {
+            $certChain = implode($certificates, chr(10)).chr(10);
           }
 
           // Break for loop
