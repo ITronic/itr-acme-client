@@ -42,7 +42,7 @@ class itrAcmeClient {
    *
    * This is the Let's Encrypt ACME API endpoint
    */
-  public $ca = 'https://acme-v01.api.letsencrypt.org';
+  public $ca = 'https://acme-v02.api.letsencrypt.org';
 
   /**
    * @var string The ACME testing endpoint of the Certificate Authority
@@ -53,7 +53,7 @@ class itrAcmeClient {
    * @see https://letsencrypt.org/docs/rate-limits/
    * @see https://letsencrypt.org/docs/staging-environment/
    */
-  public $caTesting = 'https://acme-staging.api.letsencrypt.org';
+  public $caTesting = 'https://acme-staging-v02.api.letsencrypt.org';
 
   /**
    * @var string The url to the directory relative to the $ca
@@ -64,11 +64,17 @@ class itrAcmeClient {
    * @var array The directory of the ACME implementation
    */
   public $directory = [
-    'new-authz' => '',
-    'new-cert'  => '',
-    'new-reg'   => '',
-    'meta'      => [
-      'terms-of-service' => ''
+    'newAccount' => '',
+    'newNonce'   => '',
+    'newOrder'   => '',
+    'revokeCert' => '',
+    'keyChange'  => '',
+    'newAuthz'   => '',
+    'meta'       => [
+      'termsOfService'          => '',
+      'website'                 => '',
+      'caaIdentities'           => '',
+      'externalAccountRequired' => ''
     ]
   ];
 
@@ -276,11 +282,10 @@ class itrAcmeClient {
 
     // Validate directory
     if (!is_array($this->directory) ||
-      !array_key_exists('new-authz', $this->directory) ||
-      !array_key_exists('new-cert', $this->directory) ||
-      !array_key_exists('new-reg', $this->directory)
+      !array_key_exists('newAccount', $this->directory) ||
+      !array_key_exists('newNonce', $this->directory) ||
+      !array_key_exists('newOrder', $this->directory)
     ) {
-
       $this->log('Directory information are incomplete!', 'exception');
       throw new \RuntimeException('Directory information are incomplete!', 400);
     }
@@ -313,12 +318,11 @@ class itrAcmeClient {
 
     // Build payload array
     $payload = [
-      'resource' => 'new-reg'
     ];
 
     // Add Subscriber Agreement
-    if (!empty($this->directory['meta']['terms-of-service'])) {
-      $payload['agreement'] = $this->directory['meta']['terms-of-service'];
+    if (!empty($this->directory['meta']['termsOfService'])) {
+      $payload['termsOfServiceAgreed'] = true;
     }
 
     // Add contact information if exists
@@ -326,7 +330,7 @@ class itrAcmeClient {
       $payload['contact'] = (array) $this->contact;
     }
 
-    $this->signedRequest($this->directory['new-reg'], $payload);
+    $this->signedRequest($this->directory['newAccount'], $payload);
 
     if ($this->lastResponse['status'] !== 201) {
       $this->log('Account registration failed: ' . $this->lastResponse['status'], 'exception');
@@ -825,7 +829,7 @@ class itrAcmeClient {
 
     // Build header object for request
     if ($privateKeyDetails['type'] === OPENSSL_KEYTYPE_EC) {
-      $header = [
+      $protected = [
         'alg' => 'ES256',
         'jwk' => [
           'kty' => 'EC',
@@ -835,7 +839,7 @@ class itrAcmeClient {
         ]
       ];
     } else {
-      $header = [
+      $protected = [
         'alg' => 'RS256',
         'jwk' => [
           'kty' => 'RSA',
@@ -845,11 +849,9 @@ class itrAcmeClient {
       ];
     }
 
-    $protected = $header;
-
     // Get Replay-Nonce for next request
     if (empty($this->lastResponse) || strpos($this->lastResponse['header'], 'Replay-Nonce') === false) {
-      $this->lastResponse = RestHelper::get($this->ca . '/directory');
+      $this->lastResponse = RestHelper::get($this->directory['newNonce']);
     }
 
     if (preg_match('/Replay\-Nonce: (.+)/i', $this->lastResponse['header'], $matches)) {
@@ -858,6 +860,8 @@ class itrAcmeClient {
       $this->log('Could not get Nonce!', 'exception');
       throw new \RuntimeException('Could not get Nonce!', 500);
     }
+
+    $protected['url'] = $uri;
 
     // Encode base64 payload and protected header
     $payload64   = RestHelper::base64url_encode(str_replace('\\/', '/', json_encode($payload)));
@@ -868,7 +872,6 @@ class itrAcmeClient {
     $signed64 = RestHelper::base64url_encode($signed);
 
     $data = [
-      'header'    => $header,
       'protected' => $protected64,
       'payload'   => $payload64,
       'signature' => $signed64
@@ -880,7 +883,7 @@ class itrAcmeClient {
     }
 
     $this->log('Sending signed request to ' . $uri, 'info');
-
+var_dump([$protected,$data]);
     // Post Signed data to API endpoint
     $this->lastResponse = RestHelper::post($uri, json_encode($data));
   }
@@ -1573,7 +1576,7 @@ class RestHelper {
       CURLOPT_RETURNTRANSFER => 1,
       CURLOPT_HTTPHEADER     => [
         'Accept: application/json',
-        'Content-Type: application/json'
+        'Content-Type: application/jose+json'
       ],
       CURLOPT_HEADER         => 1,
       CURLOPT_FOLLOWLOCATION => 1,
