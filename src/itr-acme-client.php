@@ -408,7 +408,11 @@ class itrAcmeClient {
 
         // Ask the challengeManager to validate domain control
         try {
-          if (!$this->challengeManager->validateDomainControl($domain)) {
+          $localDomain = $domain;
+          if (substr($domain, 0, 2) === '*.') {
+            $localDomain = substr($domain, 2);
+          }
+          if (!$this->challengeManager->validateDomainControl($localDomain)) {
             throw new \RuntimeException('Failed to validate control of ' . $domain, 500);
           }
         } catch (\RuntimeException $e) {
@@ -1116,7 +1120,7 @@ abstract class itrAcmeChallengeManagerClass implements itrAcmeChallengeManager {
         'subDomain' => ''
       ];
 
-      exec($this->itrAcmeClient->execDig . '  +noall +authority +comments +nottlid ANY ' . $fqdn, $output);
+      exec($this->itrAcmeClient->execDig . '  +noall +authority +comments +nottlid ' . $fqdn, $output);
 
       // Find nameserver and check if domain exists
       foreach ($output as $k => $v) {
