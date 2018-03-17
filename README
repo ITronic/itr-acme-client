@@ -1,7 +1,7 @@
 ITronic ACME Client
 ====================
 
-This library implements the ACME 1.0 draft 04 protocol (https://tools.ietf.org/html/draft-ietf-acme-acme-04)
+This library implements the ACME 1.0 draft 10 protocol (https://tools.ietf.org/html/draft-ietf-acme-acme-10)
 
 Requirements
 ---------------------
