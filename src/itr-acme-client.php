@@ -874,7 +874,7 @@ class itrAcmeClient {
       'signature' => $signed64
     ];
 
-    // Check if we got a relativ url and append ca url
+    // Check if we got a relative url and append ca url
     if (strpos($uri, '://') === false) {
       $uri = $this->ca . $uri;
     }
@@ -1435,7 +1435,7 @@ class itrAcmeChallengeManagerDns extends itrAcmeChallengeManagerClass {
 
     $ret       = 0;
     $output    = [];
-    $info      = $this->getDnsInformation($fqdn);
+    $info      = $this->getDnsInformation($domain);
     $domain    = $info['domain'];
     $subDomain = $info['subDomain'];
 
