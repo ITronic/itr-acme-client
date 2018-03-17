@@ -514,6 +514,13 @@ class itrAcmeClient {
             break;
           }
         }
+
+        // Check if we finished the challenge successfuly, if not cleanup and throw an exception
+        if ($this->lastResponse['json']['status'] !== 'valid') {
+          $this->challengeManager->cleanupChallenge($domain, $challenge);
+          $this->log('Challenge status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 'exception');
+          throw new \RuntimeException('Challenge status: ' . $this->lastResponse['json']['status'] . ' Response: ' . $this->lastResponse['body'], 500);
+        }
       }
 
       // Generate a private key for all domains
