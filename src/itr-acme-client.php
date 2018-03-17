@@ -1479,6 +1479,28 @@ class RestHelper {
   }
 
   /**
+   * Call the url as HEAD
+   *
+   * @param string $url    The url
+   * @param array  $obj    The parameters
+   * @param string $return The Format of the result
+   *
+   * @return array|string  The result
+   */
+  public static function head(string $url, array $obj = [], string $return = 'print') {
+
+    $curl = self::loadCurl($url);
+
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'HEAD');
+
+    if (strrpos($url, '?') === false) {
+      $url .= '?' . http_build_query($obj);
+    }
+
+    return self::execCurl($curl, $return);
+  }
+
+  /**
    * Call the url as POST
    *
    * @param string       $url    The url
