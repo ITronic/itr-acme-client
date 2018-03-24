@@ -216,6 +216,12 @@ class itrAcmeClient {
    */
   public $execDig = '/usr/bin/dig';
 
+
+  /**
+   * @var bool Disable builtin SCT registration
+   */
+  public $disableSct = false;
+
   /**
    * @var array If empty get filled by $sctLogServerJsonUrl
    */
@@ -229,7 +235,7 @@ class itrAcmeClient {
   /**
    * @var int The minimum different operators
    */
-  public $sctMinimumOperators = 2;
+  public $sctMinimumOperators = 1;
 
   /**
    * @var string A JSON encoded file with all useable SCT Server
@@ -645,6 +651,10 @@ class itrAcmeClient {
 
     foreach ($pem as $keyType => $files) {
       $pem[$keyType]['pem'] = implode('', $files);
+
+      if (!$this->disableSct) {
+        $pem[$keyType]['sct'] = $this->getSct($certificate, $certChain);
+      }
     }
 
     $this->log('Certificate generation finished.', 'info');
@@ -652,43 +662,50 @@ class itrAcmeClient {
     return $pem;
   }
 
-
   /**
-   * get Signed Certificate Timestamp
+   * Generates an SCT file
    *
-   * @param string $crt
+   * @param string $certificate The certificate
+   * @param string $chain       The chain for ther certificate
    *
-   * @return array
+   * @return array The result is valid if 'sct' is not empty and count > 0
    */
-  public function getSct(string $certificate, string $chain):array {
+  public function getSct(string $certificate, string $chain): array {
 
     $this->log('Start getting SCT entries', 'debug');
-    $size = 0;
+    $size       = 0;
     $successful = 0;
     $operators  = [];
     $return     = [];
     $request    = ['chain' => []];
 
     if (!$this->loadSctLogServer()) {
-      $return['sct'] = '';
+      $return['sct']   = '';
       $return['count'] = 0;
 
       return $return;
     }
 
-    $request['chain'][] = str_replace(['-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', implode('', explode(chr(10), $certificate)));
+    $request['chain'][] = str_replace([
+                                        '-----BEGIN CERTIFICATE-----',
+                                        '-----END CERTIFICATE-----'
+                                      ], '', implode('', explode(chr(10), $certificate)));
 
     if (!empty($chain)) {
-      $request['chain'][]  = str_replace(['-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', implode('', explode(chr(10), $chain)));
+      $request['chain'][] = str_replace([
+                                          '-----BEGIN CERTIFICATE-----',
+                                          '-----END CERTIFICATE-----'
+                                        ], '', implode('', explode(chr(10), $chain)));
     }
 
     $request = json_encode($request);
 
+    // Randomize the SCT log servers
     shuffle($this->sctLogServers['logs']);
 
-    foreach($this->sctLogServers['logs'] as $logServer) {
+    foreach ($this->sctLogServers['logs'] as $logServer) {
 
-      if (array_key_exists($logServer["operated_by"][0], $operators)) {
+      if ($this->sctMinimumOperators > 1 && array_key_exists($logServer["operated_by"][0], $operators)) {
         $this->log('We already have an SCT log server by operator: ' . $this->sctLogServers['operators'][$logServer["operated_by"][0]]['name'] . ' skipping ' . $logServer['description'], 'debug');
         continue;
       }
@@ -730,25 +747,23 @@ class itrAcmeClient {
 
       $this->log('Got entry from SCT Log Server: ' . $logServer['description'], 'debug');
 
-      $return[$logServer['url']] = $json;
-
-
       $successful++;
+      $return[$logServer['url']]               = $json;
+      $return[$logServer['url']]['status']     = 200;
       $operators[$logServer["operated_by"][0]] = true;
 
-      $return[$logServer['url']]['status'] = 200;
-
-      $version =  $return[$logServer['url']]['sct_version'];
-      $id = base64_decode($return[$logServer['url']]['id']);
-      $timestamp = $return[$logServer['url']]['timestamp'];
+      // Build the SCT string for this server
+      $version    = $return[$logServer['url']]['sct_version'];
+      $id         = base64_decode($return[$logServer['url']]['id']);
+      $timestamp  = $return[$logServer['url']]['timestamp'];
       $extensions = base64_decode($return[$logServer['url']]['extensions']);
-      $signature = base64_decode($return[$logServer['url']]['signature']);
+      $signature  = base64_decode($return[$logServer['url']]['signature']);
 
       $format = 'C1a' . strlen($id) . 'Jna' . strlen($extensions) . 'a' . strlen($signature);
 
-      $sct = pack( $format, '0', $id, $timestamp, strlen($extensions), $extensions, $signature);
+      $sct = pack($format, '0', $id, $timestamp, strlen($extensions), $extensions, $signature);
 
-      $size += 2 + strlen($sct);
+      $size                             += 2 + strlen($sct);
       $return[$logServer['url']]['sct'] = $sct;
 
       // Check if we have enough servers and operators
@@ -762,59 +777,75 @@ class itrAcmeClient {
       $this->log('We don\'t have enough SCT log entries or different operators.', 'notice');
 
       $return['count'] = $successful;
-      $return['sct'] = '';
+      $return['sct']   = '';
+
       return $return;
     }
 
+    // Build the SCT file
     $sct = pack('n', $size);
 
-    foreach($return as $logServer) {
-      $sct .= pack('na'.strlen($logServer['sct']), strlen($logServer['sct']), $logServer['sct']);
+    foreach ($return as $logServer) {
+      $sct .= pack('na' . strlen($logServer['sct']), strlen($logServer['sct']), $logServer['sct']);
     }
 
-    $return['sct'] = $sct;
+    $return['sct']   = $sct;
     $return['count'] = $successful;
 
     return $return;
   }
 
+  /**
+   * loads the SCT Log Server list from the repository and cache it for 24 hours.
+   *
+   * @return bool If false we where unable to load the list.
+   */
   protected function loadSctLogServer() {
 
+    // Skip if the list is already loaded
     if (!empty($this->sctLogServers)) {
       return true;
     }
 
     $cacheFile = $this->certAccountDir . '/sct_cache.json';
-    $year = date('Y');
+    $year      = date('Y');
 
+    // Load the cache if it exists and is not older then 24 hours
     if (file_exists($cacheFile) && filemtime($cacheFile) > $_SERVER['REQUEST_TIME'] - 86400) {
       $this->log('Loading SCT log servers from cache file: ' . $cacheFile, 'debug');
       $this->sctLogServers = json_decode(file_get_contents($cacheFile), true);
+
       return true;
     }
 
     $this->log('Requesting SCT log servers from: ' . $this->sctLogServerJsonUrl, 'debug');
 
-    $result =  RestHelper::get($this->sctLogServerJsonUrl);
+    // Request the List form the Server
+    $result = RestHelper::get($this->sctLogServerJsonUrl);
 
     if ($result['status'] != 200) {
       $this->log('Error loading SCT Log Server List: ' . $result['status'], 'notice');
+
       return false;
     }
 
     if (empty($result['body'])) {
       $this->log('Error loading SCT Log Server List: ' . $result['status'], 'notice');
+
       return false;
     }
 
+    // Decode JSON result
     $json = json_decode($result['body'], true);
 
     if (json_last_error() !== JSON_ERROR_NONE) {
       $this->log('Error loading SCT Log Server JSON: ' . json_last_error_msg(), 'notice');
+
       return false;
     }
 
-    foreach($json['logs'] as $k=>$server) {
+    // Remove all disabled or not valid log servers
+    foreach ($json['logs'] as $k => $server) {
       if (!empty($server['disabled'])) {
         unset($json['logs'][$k]);
       }
@@ -823,13 +854,15 @@ class itrAcmeClient {
       }
     }
 
+    $this->log('Loaded SCT Log Server with ' . count($this->sctLogServers['logs']) . ' and ' . count($this->sctLogServers['operators']) . ' operators.', 'info');
+
+    // Set the log server list public
     $this->sctLogServers = $json;
 
-    $this->log('Loaded SCT Log Server with ' . count($this->sctLogServers['logs']) . ' and ' . count($this->sctLogServers['operators']) . ' operators.', 'debug');
-
-
     $this->log('Save SCT Log Servers to cache: ' . $cacheFile, 'debug');
-    file_put_contents($cacheFile, json_encode($this->sctLogServers));
+    if (!file_put_contents($cacheFile, json_encode($this->sctLogServers))) {
+      $this->log('Unable to save SCT Log Servers to cache: ' . $cacheFile, 'notice');
+    }
 
     return true;
   }

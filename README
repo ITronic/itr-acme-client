@@ -3,6 +3,15 @@ ITronic ACME Client
 
 This library implements the ACME 1.0 draft 10 protocol (https://tools.ietf.org/html/draft-ietf-acme-acme-10)
 
+Features
+---------------------
+
+* ACMEv2 support
+* dns-01 challenge support
+* http-01 challenge support
+* Wildcard support
+* Signed Certificate Timestamp (SCT) registration support
+
 Requirements
 ---------------------
 
