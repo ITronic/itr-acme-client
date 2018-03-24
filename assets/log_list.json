@@ -1,6 +1,7 @@
 {
   "logs": [
     {
+      "valid_year": 2018,
       "description": "Google 'Argon2018' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0gBVBa3VR7QZu82V+ynXWD14JM3ORp37MtRxTmACJV5ZPtfUA7htQ2hofuigZQs+bnFZkje+qejxoyvk2Q1VaA==",
       "url": "ct.googleapis.com/logs/argon2018/",
@@ -11,6 +12,7 @@
       "dns_api_endpoint": "argon2018.ct.googleapis.com"
     },
     {
+      "valid_year": 2019,
       "description": "Google 'Argon2019' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEI3MQm+HzXvaYa2mVlhB4zknbtAT8cSxakmBoJcBKGqGwYS0bhxSpuvABM1kdBTDpQhXnVdcq+LSiukXJRpGHVg==",
       "url": "ct.googleapis.com/logs/argon2019/",
@@ -21,6 +23,7 @@
       "dns_api_endpoint": "argon2019.ct.googleapis.com"
     },
     {
+      "valid_year": 2020,
       "description": "Google 'Argon2020' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE6Tx2p1yKY4015NyIYvdrk36es0uAc1zA4PQ+TGRY+3ZjUTIYY9Wyu+3q/147JG4vNVKLtDWarZwVqGkg6lAYzA==",
       "url": "ct.googleapis.com/logs/argon2020/",
@@ -31,6 +34,7 @@
       "dns_api_endpoint": "argon2020.ct.googleapis.com"
     },
     {
+      "valid_year": 2021,
       "description": "Google 'Argon2021' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETeBmZOrzZKo4xYktx9gI2chEce3cw/tbr5xkoQlmhB18aKfsxD+MnILgGNl0FOm0eYGilFVi85wLRIOhK8lxKw==",
       "url": "ct.googleapis.com/logs/argon2021/",
@@ -41,6 +45,7 @@
       "dns_api_endpoint": "argon2021.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "Google 'Aviator' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1/TMabLkDpCjiupacAlP7xNi0I1JYP8bQFAHDG1xhtolSY1l4QgNRzRrvSe8liE+NPWHdjGxfx3JhTsN9x8/6Q==",
       "url": "ct.googleapis.com/aviator/",
@@ -87,6 +92,7 @@
       "dns_api_endpoint": "rocketeer.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "Google 'Skydiver' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEmyGDvYXsRJsNyXSrYc9DjHsIa2xzb4UR7ZxVoV6mrc9iZB7xjI6+NrOiwH+P/xxkRmOFG6Jel20q37hTh58rA==",
       "url": "ct.googleapis.com/skydiver/",
@@ -97,6 +103,7 @@
       "dns_api_endpoint": "skydiver.ct.googleapis.com"
     },
     {
+      "valid_year": 2018,
       "description": "Cloudflare 'Nimbus2018' Log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAsVpWvrH3Ke0VRaMg9ZQoQjb5g/xh1z3DDa6IuxY5DyPsk6brlvrUNXZzoIg0DcvFiAn2kd6xmu4Obk5XA/nRg==",
       "url": "ct.cloudflare.com/logs/nimbus2018/",
@@ -107,6 +114,7 @@
       "dns_api_endpoint": "cloudflare-nimbus2018.ct.googleapis.com"
     },
     {
+      "valid_year": 2019,
       "description": "Cloudflare 'Nimbus2019' Log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkZHz1v5r8a9LmXSMegYZAg4UW+Ug56GtNfJTDNFZuubEJYgWf4FcC5D+ZkYwttXTDSo4OkanG9b3AI4swIQ28g==",
       "url": "ct.cloudflare.com/logs/nimbus2019/",
@@ -117,6 +125,7 @@
       "dns_api_endpoint": "cloudflare-nimbus2019.ct.googleapis.com"
     },
     {
+      "valid_year": 2020,
       "description": "Cloudflare 'Nimbus2020' Log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE01EAhx4o0zPQrXTcYjgCt4MVFsT0Pwjzb1RwrM0lhWDlxAYPP6/gyMCXNkOn/7KFsjL7rwk78tHMpY8rXn8AYg==",
       "url": "ct.cloudflare.com/logs/nimbus2020/",
@@ -127,6 +136,7 @@
       "dns_api_endpoint": "cloudflare-nimbus2020.ct.googleapis.com"
     },
     {
+      "valid_year": 2021,
       "description": "Cloudflare 'Nimbus2021' Log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExpon7ipsqehIeU1bmpog9TFo4Pk8+9oN8OYHl1Q2JGVXnkVFnuuvPgSo2Ep+6vLffNLcmEbxOucz03sFiematg==",
       "url": "ct.cloudflare.com/logs/nimbus2021/",
@@ -147,6 +157,7 @@
       "dns_api_endpoint": "digicert.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "DigiCert Log Server 2",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzF05L2a4TH/BLgOhNKPoioYCrkoRxvcmajeb8Dj4XQmNY+gxa4Zmz3mzJTwe33i0qMVp+rfwgnliQ/bM/oFmhA==",
       "url": "ct2.digicert-ct.com/log/",
@@ -177,6 +188,7 @@
       "dns_api_endpoint": "symantec-vega.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "Symantec 'Sirius' log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEowJkhCK7JewN47zCyYl93UXQ7uYVhY/Z5xcbE4Dq7bKFN61qxdglnfr0tPNuFiglN+qjN2Syxwv9UeXBBfQOtQ==",
       "url": "sirius.ws.symantec.com/",
@@ -187,6 +199,7 @@
       "dns_api_endpoint": "symantec-sirius.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "Certly.IO log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECyPLhWKYYUgEc+tUXfPQB4wtGS2MNvXrjwFCCnyYJifBtd2Sk7Cu+Js9DNhMTh35FftHaHu6ZrclnNBKwmbbSA==",
       "url": "log.certly.io/",
@@ -209,6 +222,7 @@
       "dns_api_endpoint": "izenpe1.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "WoSign log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzBGIey1my66PTTBmJxklIpMhRrQvAdPG+SvVyLpzmwai8IoCnNBrRhgwhbrpJIsO0VtwKAx+8TpFf1rzgkJgMQ==",
       "url": "ctlog.wosign.com/",
@@ -251,6 +265,7 @@
       "dns_api_endpoint": "cnnic.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "StartCom log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESPNZ8/YFGNPbsu1Gfs/IEbVXsajWTOaft0oaFIZDqUiwy1o/PErK38SCFFWa+PeOQFXc9NKv6nV0+05/YIYuUQ==",
       "url": "ct.startssl.com/",
@@ -262,6 +277,7 @@
       "dns_api_endpoint": "startcom1.ct.googleapis.com"
     },
     {
+      "disabled": true,
       "description": "Comodo 'Sabre' CT log",
       "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8m/SiQ8/xfiHHqtls9m7FyOMBg4JVZY9CgiixXGz0akvKD6DEL8S0ERmFe9U4ZiA0M4kbT5nmuk3I85Sk4bagA==",
       "url": "sabre.ct.comodo.com/",
