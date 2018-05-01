@@ -220,7 +220,7 @@ class itrAcmeClient {
   /**
    * @var bool Disable builtin SCT registration
    */
-  public $disableSct = false;
+  public $disableSct = true;
 
   /**
    * @var array If empty get filled by $sctLogServerJsonUrl
