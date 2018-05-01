@@ -1862,7 +1862,8 @@ class RestHelper {
 
     if (self::$verifySsl === false) {
       curl_setopt_array($curl, [
-        CURLOPT_SSL_VERIFYPEER => 0
+        CURLOPT_SSL_VERIFYPEER => 0,
+        CURLOPT_SSL_VERIFYHOST => 0
       ]);
     }
 
