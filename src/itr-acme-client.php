@@ -1741,7 +1741,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function get(string $url, array $obj = [], string $return = 'print') {
+  public static function get(string $url, array $obj = [], string $return = 'complete') {
 
     $curl = self::loadCurl($url);
 
@@ -1761,7 +1761,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function head(string $url, array $obj = [], string $return = 'print') {
+  public static function head(string $url, array $obj = [], string $return = 'complete') {
 
     $curl = self::loadCurl($url);
 
@@ -1783,7 +1783,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function post(string $url, $obj = [], string $return = 'print') {
+  public static function post(string $url, $obj = [], string $return = 'complete') {
 
     $curl = self::loadCurl($url);
 
@@ -1802,7 +1802,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function put(string $url, array $obj = [], string $return = 'print') {
+  public static function put(string $url, array $obj = [], string $return = 'complete') {
 
     $curl = self::loadCurl($url);
 
@@ -1821,7 +1821,7 @@ class RestHelper {
    *
    * @return array|string  The result
    */
-  public static function delete(string $url, array $obj = [], string $return = 'print') {
+  public static function delete(string $url, array $obj = [], string $return = 'complete') {
 
     $curl = self::loadCurl($url);
 
@@ -1872,12 +1872,12 @@ class RestHelper {
   /**
    * Executes the cUrl request and outputs the formation
    *
-   * @param  $curl    resource The cUrl object to fetch
-   * @param  $return  string The result formation
+   * @param  resource $curl    The cUrl object to fetch
+   * @param  string   $return  The result type
    *
    * @return array|string   The result based on $return parameter
    */
-  public static function execCurl($curl, string $return = 'print') {
+  public static function execCurl($curl, string $return = 'complete') {
 
     $data = curl_exec($curl);
     if ($data === false) {
@@ -1892,15 +1892,18 @@ class RestHelper {
     $header = substr($data, 0, $info['header_size']);
     $body   = substr($data, $info['header_size']);
 
-    if ($return === 'print') {
+    if ($return === 'complete') {
       return [
         'status' => $info['http_code'],
+        'info'   => $info,
         'header' => $header,
         'body'   => $body
       ];
-    } else {
+    } elseif ($return === 'body') {
       return $body;
     }
+
+    return '';
   }
 
   /**
