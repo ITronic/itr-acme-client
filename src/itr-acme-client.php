@@ -212,6 +212,11 @@ class itrAcmeClient {
   public $dnsTimeout = 300;
 
   /**
+   * @var int Microseconds to wait after SSL_ERROR_SYSCALL in execCurl
+   */
+  public $curlRetryWait = 100000;
+
+  /**
    * @var string The path to dig binary
    */
   public $execDig = '/usr/bin/dig';
@@ -266,15 +271,17 @@ class itrAcmeClient {
    */
   public function init(): bool {
 
-    // check if we are already initialised
+
     $this->log('Start initialisation.', 'debug');
 
+    // check if we are already initialised
     if ($this->initDone) {
       $this->log('Object already initialised.', 'exception');
       throw new \RuntimeException('Object already initialised!', 500);
     }
 
-    $this->initDone = true;
+    // set retry waith in case of SSL_ERROR_SYSCALL
+    RestHelper::$curlRetryWait = $this->curlRetryWait;
 
     // build and clean up variables
     rtrim($this->certDir, '/');
@@ -321,6 +328,8 @@ class itrAcmeClient {
       $this->log('Directory information are incomplete!', 'exception');
       throw new \RuntimeException('Directory information are incomplete!', 400);
     }
+
+    $this->initDone = true;
 
     $this->log('Initialisation done.', 'debug');
 
@@ -1732,6 +1741,9 @@ class RestHelper {
   /** @var bool Check for trusted PEER and HOSTNAME */
   static $verifySsl = true;
 
+  /** @var int Microseconds to wait after SSL_ERROR_SYSCALL in execCurl */
+  static $curlRetryWait = 100000;
+
   /**
    * Call the url as GET
    *
@@ -1873,6 +1885,9 @@ class RestHelper {
   /**
    * Executes the cUrl request and outputs the formation
    *
+   * Error handling in case of 'SSL_ERROR_SYSCALL'
+   * this is usually the case if the other side is simply closing the connection
+   *
    * @param  resource $curl    The cUrl object to fetch
    * @param  string   $return  The result type
    *
@@ -1882,7 +1897,16 @@ class RestHelper {
 
     $data = curl_exec($curl);
     if ($data === false) {
-      throw new \RuntimeException(curl_error($curl), 500);
+    	$curl_error = curl_error($curl);
+      if (strpos($curl_error, 'SSL_ERROR_SYSCALL') !== false) {
+        usleep(self::$curlRetryWait);
+        $data = curl_exec($curl);
+         if ($data === false) {
+           throw new \RuntimeException(curl_exec($curl), 500);
+        }
+      } else {
+        throw new \RuntimeException($curl_error, 500);
+      }
     }
     $info = curl_getinfo($curl);
     if ($info === false) {
