@@ -619,11 +619,11 @@ class itrAcmeClient {
 
           $this->log('Certificate generation complete.', 'info');
 
-          $certificates = explode(chr(10).chr(10), $this->lastResponse['body']);
-          $certificate  = array_shift($certificates).chr(10);
+          $certificates = explode(chr(10) . chr(10), $this->lastResponse['body']);
+          $certificate  = array_shift($certificates) . chr(10);
 
           if (count($certificates) > 0) {
-            $certChain = implode($certificates, chr(10)).chr(10);
+            $certChain = implode(chr(10), $certificates) . chr(10);
           }
 
           // Break for loop
