@@ -543,12 +543,12 @@ class itrAcmeClient {
           $this->lastResponse         = RestHelper::get($challenge['url']);
           $this->lastResponse['json'] = json_decode($this->lastResponse['body'], true);
 
-          if ($this->lastResponse['json']['status'] === 'pending') {
-            $this->log('Verification is still pending...', 'info');
-            usleep(1500000);
-          } else {
-            break;
+          if (in_array($this->lastResponse['json']['status'], ['valid', 'invalid'], true)) {
+              break;
           }
+
+          $this->log('Verification is still pending...', 'info');
+          usleep(1500000);
         }
 
         // Check if we finished the challenge successfuly, if not cleanup and throw an exception
